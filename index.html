@@ -6,6 +6,11 @@
     <title>Sistema de Despensa & Almoxarifado</title>
     <!-- Tailwind CSS para design moderno e limpo -->
     <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- SDK do Firebase (Versão Compatível por CDN) -->
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
+
     <style>
         /* Estilos específicos para impressão */
         @media print {
@@ -34,7 +39,7 @@
             <div class="text-center mb-6">
                 <span class="text-5xl">📦</span>
                 <h2 class="text-2xl font-extrabold text-blue-900 mt-3">Acesso ao Sistema</h2>
-                <p class="text-xs text-gray-500 mt-1 uppercase tracking-wider font-semibold">Controle de Despensa & Almoxarifado</p>
+                <p class="text-xs text-gray-500 mt-1 uppercase tracking-wider font-semibold">Controle de Despensa & Almoxarifado (Nuvem)</p>
             </div>
             
             <form id="form-login" onsubmit="realizarLogin(event)" class="space-y-4">
@@ -60,7 +65,7 @@
                 <span class="text-2xl">📦</span>
                 <div>
                     <h1 class="text-xl font-bold leading-tight">Controle de Despensa</h1>
-                    <p class="text-xs text-blue-200">Gestão de Demandas & Almoxarifado</p>
+                    <p class="text-xs text-blue-200">Gestão de Demandas & Almoxarifado • Nuvem Realtime</p>
                 </div>
             </div>
             
@@ -347,7 +352,7 @@
 
     <!-- Rodapé -->
     <footer class="bg-white border-t border-gray-200 py-4 text-center text-xs text-gray-500 mt-auto no-print">
-        <p>Sistema de Gestão de Despensa • HTML5 & Local Storage • 2026</p>
+        <p>Sistema de Gestão de Despensa • Firebase Firestore Realtime • 2026</p>
     </footer>
 
     <!-- ================= MODAL DE ALTERAÇÃO DE SENHA ================= -->
@@ -378,52 +383,115 @@
 
     <!-- Script de Funcionamento Interno -->
     <script>
-        // Lista padrão nova para migrar bancos antigos
-        const defaultUsers = [
-            { id: 1, name: 'Administrador', sector: 'TI & Almoxarifado', username: 'admin', password: '123', role: 'admin' },
-            { id: 2, name: 'Ana Souza', sector: 'Cozinha Principal', username: 'ana', password: '123', role: 'user' },
-            { id: 3, name: 'Carlos Santos', sector: 'Refeitório Administrativo', username: 'carlos', password: '123', role: 'user' }
-        ];
+        // ============================================================
+        // ⚠️ ATENÇÃO: COLE AS SUAS CREDENCIAIS DO FIREBASE LOGO ABAIXO:
+        // ============================================================
+        const firebaseConfig = {
+  apiKey: "AIzaSyDjZMvdBPNnAFQGeE8NzqHJVmjwqJqWbpQ",
+  authDomain: "controle-despensa-6be07.firebaseapp.com",
+  projectId: "controle-despensa-6be07",
+  storageBucket: "controle-despensa-6be07.firebasestorage.app",
+  messagingSenderId: "520799843128",
+  appId: "1:520799843128:web:835b9f685264c9ffd887cd"
+};
+        // ============================================================
 
-        // --- SISTEMA AUTO-REPARADOR DE MEMÓRIA (MIGRAÇÃO) ---
-        let currentSaved = localStorage.getItem('dep_users');
-        if (currentSaved) {
-            try {
-                let parsed = JSON.parse(currentSaved);
-                if (parsed.length > 0 && !parsed[0].hasOwnProperty('username')) {
-                    localStorage.setItem('dep_users', JSON.stringify(defaultUsers));
-                }
-            } catch (e) {
-                localStorage.setItem('dep_users', JSON.stringify(defaultUsers));
-            }
-        } else {
-            localStorage.setItem('dep_users', JSON.stringify(defaultUsers));
-        }
+        // Inicializar Firebase
+        firebase.initializeApp(firebaseConfig);
+        const db = firebase.firestore();
 
-        // Dados Estruturais do Sistema
+        // Estado do Sistema
         let state = {
-            // USANDO SESSION STORAGE AQUI: se a aba fechar, o usuário é limpo!
             currentUser: JSON.parse(sessionStorage.getItem('dep_current_user')) || null,
             currentTab: 'solicitacao',
-            users: JSON.parse(localStorage.getItem('dep_users')),
-            materials: JSON.parse(localStorage.getItem('dep_materials')) || [
-                { id: 1, code: 'MAT-1502', name: 'Arroz Agulhinha Tipo 1', unit: 'Saco 5kg', balance: 15 },
-                { id: 2, code: 'MAT-3829', name: 'Azeite de Oliva Extra Virgem', unit: 'Garrafa 500ml', balance: 8 },
-                { id: 3, code: 'MAT-8291', name: 'Açúcar Refinado', unit: 'Pct 1kg', balance: 30 },
-                { id: 4, code: 'MAT-4721', name: 'Café Torrado e Moído', unit: 'Vácuo 500g', balance: 12 },
-                { id: 5, code: 'MAT-9031', name: 'Detergente Neutro Concentrado', unit: 'Frasco 500ml', balance: 25 }
-            ],
-            requests: JSON.parse(localStorage.getItem('dep_requests')) || [],
+            users: [],
+            materials: [],
+            requests: [],
             cart: [] 
         };
 
-        // Salvar estado localmente
+        // Escutas em Tempo Real do Firebase (Sincronização Automática)
+        function iniciarEscutasFirebase() {
+            // 1. Escutar usuários cadastrados
+            db.collection("users").onSnapshot((querySnapshot) => {
+                state.users = [];
+                querySnapshot.forEach((doc) => {
+                    state.users.push({ id: doc.id, ...doc.data() });
+                });
+                
+                // Se o banco estiver zerado, cria os usuários padrão de fábrica
+                if (state.users.length === 0) {
+                    criarUsuariosPadrao();
+                }
+                
+                // Atualiza a sessão local caso os dados do usuário ativo tenham mudado
+                if (state.currentUser) {
+                    const atualizado = state.users.find(u => u.username === state.currentUser.username);
+                    if (atualizado) {
+                        state.currentUser = atualizado;
+                        saveState();
+                        document.getElementById('header-user-info').innerText = `${state.currentUser.name} [${state.currentUser.sector}]`;
+                    }
+                }
+                
+                renderUsuariosList();
+            });
+
+            // 2. Escutar catálogo de materiais (Estoque)
+            db.collection("materials").onSnapshot((querySnapshot) => {
+                state.materials = [];
+                querySnapshot.forEach((doc) => {
+                    state.materials.push({ id: doc.id, ...doc.data() });
+                });
+                
+                // Se o banco estiver zerado, popula com itens iniciais
+                if (state.materials.length === 0) {
+                    criarMateriaisPadrao();
+                }
+                
+                renderCatalogo();
+                renderEstoqueList();
+            });
+
+            // 3. Escutar solicitações feitas
+            db.collection("requests").onSnapshot((querySnapshot) => {
+                state.requests = [];
+                querySnapshot.forEach((doc) => {
+                    state.requests.push({ id: doc.id, ...doc.data() });
+                });
+                
+                // Ordenar decrescente pelo timestamp ID
+                state.requests.sort((a, b) => b.id - a.id);
+                
+                renderPendentes();
+                renderHistorico();
+                renderTabsMenu();
+            });
+        }
+
+        // Criar dados padrão se o Firestore estiver vazio
+        function criarUsuariosPadrao() {
+            const defaults = [
+                { name: 'Administrador', sector: 'TI & Almoxarifado', username: 'admin', password: '123', role: 'admin' },
+                { name: 'Ana Souza', sector: 'Cozinha Principal', username: 'ana', password: '123', role: 'user' },
+                { name: 'Carlos Santos', sector: 'Refeitório Administrativo', username: 'carlos', password: '123', role: 'user' }
+            ];
+            defaults.forEach(u => db.collection("users").add(u));
+        }
+
+        function criarMateriaisPadrao() {
+            const defaults = [
+                { code: 'MAT-1502', name: 'Arroz Agulhinha Tipo 1', unit: 'Saco 5kg', balance: 15 },
+                { code: 'MAT-3829', name: 'Azeite de Oliva Extra Virgem', unit: 'Garrafa 500ml', balance: 8 },
+                { code: 'MAT-8291', name: 'Açúcar Refinado', unit: 'Pct 1kg', balance: 30 },
+                { code: 'MAT-4721', name: 'Café Torrado e Moído', unit: 'Vácuo 500g', balance: 12 },
+                { code: 'MAT-9031', name: 'Detergente Neutro Concentrado', unit: 'Frasco 500ml', balance: 25 }
+            ];
+            defaults.forEach(m => db.collection("materials").add(m));
+        }
+
+        // Salvar estado local da sessão ativa
         function saveState() {
-            localStorage.setItem('dep_users', JSON.stringify(state.users));
-            localStorage.setItem('dep_materials', JSON.stringify(state.materials));
-            localStorage.setItem('dep_requests', JSON.stringify(state.requests));
-            
-            // Grava a sessão do usuário ativo apenas na sessão do navegador (fecha a aba = apaga)
             if (state.currentUser) {
                 sessionStorage.setItem('dep_current_user', JSON.stringify(state.currentUser));
             } else {
@@ -435,6 +503,12 @@
 
         function realizarLogin(e) {
             e.preventDefault();
+            
+            if (state.users.length === 0) {
+                alert("Conectando ao banco de dados... Aguarde 2 segundos e clique em Entrar de novo!");
+                return;
+            }
+
             const userVal = document.getElementById('login-username').value.trim().toLowerCase();
             const passVal = document.getElementById('login-password').value;
 
@@ -453,11 +527,10 @@
             }
         }
 
-        // Realizar logout de forma limpa
         function realizarLogout() {
             state.currentUser = null;
             state.cart = [];
-            sessionStorage.removeItem('dep_current_user'); // Limpa da sessão
+            sessionStorage.removeItem('dep_current_user');
             
             const loginScreen = document.getElementById('login-screen');
             loginScreen.classList.remove('hidden');
@@ -475,7 +548,6 @@
             loginScreen.classList.add('hidden');
             document.getElementById('header-user-info').innerText = `${state.currentUser.name} [${state.currentUser.sector}]`;
 
-            // ALERTA DE SENHA PADRÃO: Mostra o banner se a senha atual for a provisória '123'
             if (state.currentUser.password === '123') {
                 document.getElementById('alerta-senha-padrao').classList.remove('hidden');
             } else {
@@ -583,7 +655,7 @@
                 const inCart = state.cart.find(item => item.materialId === m.id);
                 const buttonHtml = inCart 
                     ? `<span class="bg-blue-100 text-blue-800 text-xs font-semibold px-2.5 py-1 rounded-full">Na lista</span>`
-                    : `<button onclick="addToCart(${m.id})" class="bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold py-1 px-3 rounded shadow transition-all">Selecionar</button>`;
+                    : `<button onclick="addToCart('${m.id}')" class="bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold py-1 px-3 rounded shadow transition-all">Selecionar</button>`;
 
                 html += `
                     <tr class="hover:bg-gray-50 transition-colors">
@@ -604,42 +676,6 @@
             state.cart.push({ materialId: materialId, qty: 1 });
             renderCarrinho();
             renderCatalogo();
-        }
-
-        // ================= FUNÇÕES: ABA USUÁRIOS (ADMIN) =================
-
-        function renderUsuariosList() {
-            const tbody = document.getElementById('usuarios-tbody');
-            if (state.users.length === 0) {
-                tbody.innerHTML = `<tr><td colspan="5" class="py-8 text-center text-gray-400">Nenhum usuário cadastrado.</td></tr>`;
-                return;
-            }
-
-            let html = '';
-            state.users.forEach(user => {
-                const isCurrentUser = state.currentUser && state.currentUser.id === user.id;
-                
-                const deleteAction = isCurrentUser 
-                    ? `<span class="text-xs text-gray-400 italic font-semibold">Sua Conta</span>`
-                    : `<button onclick="removerUsuario(${user.id})" class="text-red-500 hover:text-red-700 hover:underline text-xs">Excluir</button>`;
-                
-                const badgePerfil = user.role === 'admin' 
-                    ? `<span class="bg-blue-100 text-blue-800 font-bold text-[10px] px-2 py-0.5 rounded-full uppercase">Admin</span>`
-                    : `<span class="bg-slate-100 text-slate-800 font-semibold text-[10px] px-2 py-0.5 rounded-full uppercase">Funcionário</span>`;
-
-                html += `
-                    <tr class="hover:bg-gray-50">
-                        <td class="py-3 px-4 font-medium text-gray-900">${user.name}</td>
-                        <td class="py-3 px-4 text-gray-600">${user.sector}</td>
-                        <td class="py-3 px-4 text-gray-600 font-mono text-xs font-bold">${user.username}</td>
-                        <td class="py-3 px-4 text-center">${badgePerfil}</td>
-                        <td class="py-3 px-4 text-center">
-                            ${deleteAction}
-                        </td>
-                    </tr>
-                `;
-            });
-            tbody.innerHTML = html;
         }
 
         function updateCartQty(materialId, value) {
@@ -681,8 +717,8 @@
                             <span class="text-xs text-gray-500">${material.unit}</span>
                         </div>
                         <div class="flex items-center gap-1.5 flex-shrink-0">
-                            <input type="number" min="1" value="${item.qty}" onchange="updateCartQty(${material.id}, this.value)" class="w-16 text-center bg-white border border-gray-300 rounded p-1 text-sm font-medium focus:ring-1 focus:ring-blue-500 outline-none">
-                            <button onclick="removeFromCart(${material.id})" class="text-red-500 hover:text-red-700 hover:bg-red-50 p-1 rounded transition-all" title="Remover">
+                            <input type="number" min="1" value="${item.qty}" onchange="updateCartQty('${material.id}', this.value)" class="w-16 text-center bg-white border border-gray-300 rounded p-1 text-sm font-medium focus:ring-1 focus:ring-blue-500 outline-none">
+                            <button onclick="removeFromCart('${material.id}')" class="text-red-500 hover:text-red-700 hover:bg-red-50 p-1 rounded transition-all" title="Remover">
                                 🗑️
                             </button>
                         </div>
@@ -713,14 +749,15 @@
                 return;
             }
 
+            const reqId = Date.now().toString();
             const newRequest = {
-                id: Date.now(),
                 userId: state.currentUser.id,
                 userName: state.currentUser.name,
                 userSector: state.currentUser.sector,
                 date: new Date().toLocaleString('pt-BR'),
                 status: 'pending',
                 justification: justificativaText,
+                ativo: true,
                 items: state.cart.map(item => {
                     const mat = state.materials.find(m => m.id === item.materialId);
                     return {
@@ -733,19 +770,55 @@
                 })
             };
 
-            state.requests.unshift(newRequest);
-            state.cart = []; 
-            justificativaInput.value = ''; 
-            saveState();
-            
-            renderCarrinho();
-            renderCatalogo();
-            renderTabsMenu(); 
-            
-            alert("Solicitação enviada com sucesso! Aguarde a liberação do administrador.");
+            // Envia para o Firebase Firestore
+            db.collection("requests").doc(reqId).set(newRequest)
+                .then(() => {
+                    state.cart = []; 
+                    justificativaInput.value = ''; 
+                    renderCarrinho();
+                    renderCatalogo();
+                    alert("Solicitação enviada com sucesso! Aguarde a liberação do administrador.");
+                })
+                .catch(err => {
+                    alert("Erro ao conectar com a nuvem: " + err.message);
+                });
         }
 
         // ================= FUNÇÕES: ABA USUÁRIOS (ADMIN) =================
+
+        function renderUsuariosList() {
+            const tbody = document.getElementById('usuarios-tbody');
+            if (state.users.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="5" class="py-8 text-center text-gray-400">Carregando usuários...</td></tr>`;
+                return;
+            }
+
+            let html = '';
+            state.users.forEach(user => {
+                const isCurrentUser = state.currentUser && state.currentUser.id === user.id;
+                
+                const deleteAction = isCurrentUser 
+                    ? `<span class="text-xs text-gray-400 italic font-semibold">Sua Conta</span>`
+                    : `<button onclick="removerUsuario('${user.id}')" class="text-red-500 hover:text-red-700 hover:underline text-xs">Excluir</button>`;
+                
+                const badgePerfil = user.role === 'admin' 
+                    ? `<span class="bg-blue-100 text-blue-800 font-bold text-[10px] px-2 py-0.5 rounded-full uppercase">Admin</span>`
+                    : `<span class="bg-slate-100 text-slate-800 font-semibold text-[10px] px-2 py-0.5 rounded-full uppercase">Funcionário</span>`;
+
+                html += `
+                    <tr class="hover:bg-gray-50">
+                        <td class="py-3 px-4 font-medium text-gray-900">${user.name}</td>
+                        <td class="py-3 px-4 text-gray-600">${user.sector}</td>
+                        <td class="py-3 px-4 text-gray-600 font-mono text-xs font-bold">${user.username}</td>
+                        <td class="py-3 px-4 text-center">${badgePerfil}</td>
+                        <td class="py-3 px-4 text-center">
+                            ${deleteAction}
+                        </td>
+                    </tr>
+                `;
+            });
+            tbody.innerHTML = html;
+        }
 
         function cadastrarUsuario(e) {
             e.preventDefault();
@@ -764,7 +837,6 @@
             }
 
             const newUser = {
-                id: Date.now(),
                 name: nomeInput.value.trim(),
                 sector: sectorInput.value.trim(),
                 username: loginTrimmed,
@@ -772,17 +844,17 @@
                 role: userRole.value
             };
 
-            state.users.push(newUser);
-            saveState();
-            
-            nomeInput.value = '';
-            setorInput.value = '';
-            userLogin.value = '';
-            userPass.value = '';
-            userRole.value = 'user';
-
-            renderUsuariosList();
-            alert("Novo usuário habilitado e configurado com sucesso!");
+            // Cadastra no Firebase
+            db.collection("users").add(newUser)
+                .then(() => {
+                    nomeInput.value = '';
+                    setorInput.value = '';
+                    userLogin.value = '';
+                    userPass.value = '';
+                    userRole.value = 'user';
+                    alert("Novo usuário habilitado e configurado com sucesso!");
+                })
+                .catch(err => alert("Erro ao cadastrar usuário: " + err.message));
         }
 
         function removerUsuario(id) {
@@ -792,9 +864,9 @@
             }
 
             if (confirm("Tem certeza que deseja excluir permanentemente este usuário do sistema?")) {
-                state.users = state.users.filter(u => u.id !== id);
-                saveState();
-                renderUsuariosList();
+                db.collection("users").doc(id).delete()
+                    .then(() => alert("Usuário excluído!"))
+                    .catch(err => alert("Erro ao excluir: " + err.message));
             }
         }
 
@@ -840,36 +912,40 @@
             }
 
             let cadastrados = 0;
+            const promessas = [];
+
             rows.forEach(row => {
                 const name = row.querySelector('.mat-name').value.trim();
                 const unit = row.querySelector('.mat-unit').value.trim();
                 const balance = parseInt(row.querySelector('.mat-balance').value) || 0;
 
                 if (name && unit) {
-                    state.materials.push({
-                        id: Date.now() + Math.random(),
+                    const materialData = {
                         code: gerarCodigoMaterial(), 
                         name: name,
                         unit: unit,
                         balance: balance
-                    });
+                    };
+                    
+                    // Envia cada material para o banco
+                    promessas.push(db.collection("materials").add(materialData));
                     cadastrados++;
                 }
             });
 
             if (cadastrados > 0) {
-                saveState();
-                tbody.innerHTML = ''; 
-                addMaterialInputRow(); 
-                renderEstoqueList();
-                alert(`${cadastrados} materiais cadastrados com sucesso!`);
+                Promise.all(promessas).then(() => {
+                    tbody.innerHTML = ''; 
+                    addMaterialInputRow(); 
+                    alert(`${cadastrados} materiais cadastrados no estoque!`);
+                }).catch(err => alert("Erro ao salvar materiais: " + err.message));
             }
         }
 
         function renderEstoqueList() {
             const tbody = document.getElementById('estoque-tbody');
             if (state.materials.length === 0) {
-                tbody.innerHTML = `<tr><td colspan="5" class="py-8 text-center text-gray-400">Nenhum material no almoxarifado.</td></tr>`;
+                tbody.innerHTML = `<tr><td colspan="5" class="py-8 text-center text-gray-400">Carregando almoxarifado...</td></tr>`;
                 return;
             }
 
@@ -882,8 +958,8 @@
                         <td class="py-3 px-4 text-center text-gray-600">${mat.unit}</td>
                         <td class="py-3 px-4 text-center font-bold text-blue-600">${mat.balance}</td>
                         <td class="py-3 px-4 text-center">
-                            <button onclick="ajustarSaldo(${mat.id})" class="text-blue-600 hover:underline text-xs mr-3">Ajustar Saldo</button>
-                            <button onclick="excluirMaterial(${mat.id})" class="text-red-500 hover:underline text-xs">Excluir</button>
+                            <button onclick="ajustarSaldo('${mat.id}')" class="text-blue-600 hover:underline text-xs mr-3">Ajustar Saldo</button>
+                            <button onclick="excluirMaterial('${mat.id}')" class="text-red-500 hover:underline text-xs">Excluir</button>
                         </td>
                     </tr>
                 `;
@@ -891,7 +967,6 @@
             tbody.innerHTML = html;
         }
 
-        // Ajustar o saldo físico no almoxarifado
         function ajustarSaldo(id) {
             const mat = state.materials.find(m => m.id === id);
             if (!mat) return;
@@ -900,20 +975,18 @@
             if (novoSaldo !== null) {
                 const valor = parseInt(novoSaldo);
                 if (!isNaN(valor) && valor >= 0) {
-                    mat.balance = valor;
-                    saveState();
-                    renderEstoqueList();
+                    db.collection("materials").doc(id).update({ balance: valor })
+                        .catch(err => alert("Erro ao atualizar: " + err.message));
                 } else {
-                    alert("Por favor, digite um número válido e maior ou igual a zero.");
+                    alert("Por favor, digite um número válido.");
                 }
             }
         }
 
         function excluirMaterial(id) {
             if (confirm("Tem certeza que quer remover este material do catálogo?")) {
-                state.materials = state.materials.filter(m => m.id !== id);
-                saveState();
-                renderEstoqueList();
+                db.collection("materials").doc(id).delete()
+                    .catch(err => alert("Erro ao deletar: " + err.message));
             }
         }
 
@@ -966,10 +1039,10 @@
                                 <p class="text-xs text-gray-500">${req.userSector} • Solicitado em: ${req.date}</p>
                             </div>
                             <div class="flex gap-2">
-                                <button onclick="imprimirPedido(${req.id})" class="border border-gray-300 hover:bg-gray-100 text-gray-700 font-medium text-xs px-3 py-1.5 rounded transition-all flex items-center gap-1.5">
+                                <button onclick="imprimirPedido('${req.id}')" class="border border-gray-300 hover:bg-gray-100 text-gray-700 font-medium text-xs px-3 py-1.5 rounded transition-all flex items-center gap-1.5">
                                     🖨️ Imprimir Pedido
                                 </button>
-                                <button onclick="imprimirOrdemFornecimento(${req.id})" class="border border-blue-200 hover:bg-blue-50 text-blue-700 font-semibold text-xs px-3 py-1.5 rounded transition-all flex items-center gap-1.5">
+                                <button onclick="imprimirOrdemFornecimento('${req.id}')" class="border border-blue-200 hover:bg-blue-50 text-blue-700 font-semibold text-xs px-3 py-1.5 rounded transition-all flex items-center gap-1.5">
                                     📜 Imprimir Ordem de Fornecimento
                                 </button>
                             </div>
@@ -995,10 +1068,10 @@
                             </table>
                         </div>
                         <div class="bg-gray-50 border-t border-gray-100 p-4 flex justify-end gap-3">
-                            <button onclick="recusarSolicitacao(${req.id})" class="bg-red-50 hover:bg-red-100 text-red-700 font-semibold text-sm px-4 py-2 rounded-lg transition-all">
+                            <button onclick="recusarSolicitacao('${req.id}')" class="bg-red-50 hover:bg-red-100 text-red-700 font-semibold text-sm px-4 py-2 rounded-lg transition-all">
                                 Recusar Solicitação
                             </button>
-                            <button onclick="aprovarSolicitacao(${req.id})" class="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-sm px-5 py-2 rounded-lg shadow-sm transition-all">
+                            <button onclick="aprovarSolicitacao('${req.id}')" class="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-sm px-5 py-2 rounded-lg shadow-sm transition-all">
                                 Liberar & Deduzir do Saldo
                             </button>
                         </div>
@@ -1009,10 +1082,8 @@
         }
 
         function aprovarSolicitacao(id) {
-            const reqIndex = state.requests.findIndex(r => r.id === id);
-            if (reqIndex === -1) return;
-
-            const req = state.requests[reqIndex];
+            const req = state.requests.find(r => r.id === id);
+            if (!req) return;
             
             let erroEstoque = [];
             req.items.forEach(item => {
@@ -1028,36 +1099,34 @@
                 }
             }
 
+            // Atualiza saldos no Firebase
             req.items.forEach(item => {
                 const originalMaterial = state.materials.find(m => m.id === item.materialId);
                 if (originalMaterial) {
-                    originalMaterial.balance -= item.qtyRequested;
+                    const novoSaldo = originalMaterial.balance - item.qtyRequested;
+                    db.collection("materials").doc(item.materialId).update({ balance: novoSaldo });
                 }
             });
 
-            req.status = 'approved';
-            req.dateProcessed = new Date().toLocaleString('pt-BR');
-            req.approvedBy = state.currentUser ? state.currentUser.name : 'Administrador';
-            
-            saveState();
-            renderPendentes();
-            renderTabsMenu();
-            alert("Solicitação autorizada e baixada do estoque com sucesso!");
+            // Atualiza status da solicitação
+            db.collection("requests").doc(id).update({
+                status: 'approved',
+                dateProcessed: new Date().toLocaleString('pt-BR'),
+                approvedBy: state.currentUser ? state.currentUser.name : 'Administrador'
+            }).then(() => {
+                alert("Solicitação autorizada e baixada do estoque com sucesso!");
+            });
         }
 
         function recusarSolicitacao(id) {
             if (confirm("Deseja realmente recusar esta solicitação?")) {
-                const reqIndex = state.requests.findIndex(r => r.id === id);
-                if (reqIndex === -1) return;
-
-                state.requests[reqIndex].status = 'rejected';
-                state.requests[reqIndex].dateProcessed = new Date().toLocaleString('pt-BR');
-                state.requests[reqIndex].approvedBy = state.currentUser ? state.currentUser.name : 'Administrador';
-                
-                saveState();
-                renderPendentes();
-                renderTabsMenu();
-                alert("Solicitação recusada.");
+                db.collection("requests").doc(id).update({
+                    status: 'rejected',
+                    dateProcessed: new Date().toLocaleString('pt-BR'),
+                    approvedBy: state.currentUser ? state.currentUser.name : 'Administrador'
+                }).then(() => {
+                    alert("Solicitação recusada.");
+                });
             }
         }
 
@@ -1100,9 +1169,9 @@
                         </td>
                         <td class="py-3 px-4 text-center">${statusBadge}</td>
                         <td class="py-3 px-4 text-center space-x-1 whitespace-nowrap">
-                            <button onclick="imprimirPedido(${req.id})" class="text-blue-600 hover:underline text-xs">Ver Pedido</button>
-                            ${req.status === 'approved' ? `| <button onclick="imprimirOrdemFornecimento(${req.id})" class="text-emerald-700 hover:underline text-xs font-semibold">Ordem Fornec.</button>` : ''}
-                            | <button onclick="excluirSolicitacaoLogica(${req.id})" class="text-red-500 hover:underline text-xs">Excluir</button>
+                            <button onclick="imprimirPedido('${req.id}')" class="text-blue-600 hover:underline text-xs">Ver Pedido</button>
+                            ${req.status === 'approved' ? `| <button onclick="imprimirOrdemFornecimento('${req.id}')" class="text-emerald-700 hover:underline text-xs font-semibold">Ordem Fornec.</button>` : ''}
+                            | <button onclick="excluirSolicitacaoLogica('${req.id}')" class="text-red-500 hover:underline text-xs">Excluir</button>
                         </td>
                     </tr>
                 `;
@@ -1111,15 +1180,25 @@
         }
 
         function limparHistorico() {
-            if (confirm("Atenção! Isso ocultará todo o histórico de solicitações processadas. Confirmar?")) {
+            if (confirm("Atenção! Isso ocultará todo o histórico de solicitações processadas do painel. Confirmar?")) {
+                const batch = db.batch();
                 state.requests.forEach(r => {
-                    if (r.status !== 'pending') {
-                        r.ativo = false;
+                    if (r.status !== 'pending' && r.ativo !== false) {
+                        const ref = db.collection("requests").doc(r.id);
+                        batch.update(ref, { ativo: false });
                     }
                 });
-                saveState();
-                renderHistorico();
-                renderTabsMenu();
+                
+                batch.commit().then(() => {
+                    alert("Histórico limpo!");
+                });
+            }
+        }
+
+        function excluirSolicitacaoLogica(id) {
+            if (confirm("Tem certeza que deseja ocultar esta solicitação do histórico?")) {
+                db.collection("requests").doc(id).update({ ativo: false })
+                    .then(() => renderHistorico());
             }
         }
 
@@ -1145,7 +1224,7 @@
                 `;
             });
 
-            const currentAdminName = state.currentUser ? state.currentUser.name : 'Administrador do Almoxarifado';
+            const currentAdminName = state.currentUser ? state.currentUser.name : 'Administrador';
 
             const template = `
                 <div style="font-family: Arial, sans-serif; padding: 30px;">
@@ -1196,7 +1275,7 @@
                 `;
             });
 
-            const adminName = req.approvedBy || (state.currentUser && state.currentUser.role === 'admin' ? state.currentUser.name : 'Responsável do Almoxarifado');
+            const adminName = req.approvedBy || (state.currentUser && state.currentUser.role === 'admin' ? state.currentUser.name : 'Almoxarife');
 
             const template = `
                 <div style="font-family: Arial, sans-serif; padding: 40px; border: 1px solid #ccc; max-width: 800px; margin: auto;">
@@ -1206,7 +1285,7 @@
                             <p style="margin: 3px 0 0 0; font-size: 12px; color: #666;">Controle Interno de Despensa</p>
                         </div>
                         <div style="text-align: right;">
-                            <span style="background-color: #e2e8f0; padding: 5px 10px; border-radius: 4px; font-weight: bold; font-size: 12px;">ID: #${req.id.toString().slice(-6)}</span>
+                            <span style="background-color: #e2e8f0; padding: 5px 10px; border-radius: 4px; font-weight: bold; font-size: 12px;">ID: #${req.id.slice(-6)}</span>
                         </div>
                     </div>
                     
@@ -1249,10 +1328,6 @@
                             <p style="margin: 4px 0 0 0; font-size: 11px; color: #555;">Assinatura do Administrador</p>
                         </div>
                     </div>
-
-                    <div style="margin-top: 50px; text-align: center; font-size: 12px; color: #777;">
-                        <p>Documento gerado eletronicamente para controle e conferência administrativa.</p>
-                    </div>
                 </div>
             `;
             runPrint(template);
@@ -1277,7 +1352,7 @@
                 `;
             });
 
-            const adminName = req.approvedBy || (state.currentUser && state.currentUser.role === 'admin' ? state.currentUser.name : 'Responsável do Almoxarifado');
+            const adminName = req.approvedBy || (state.currentUser && state.currentUser.role === 'admin' ? state.currentUser.name : 'Almoxarife');
 
             const template = `
                 <div style="font-family: Arial, sans-serif; padding: 40px; border: 2px solid #1e293b; max-width: 800px; margin: auto;">
@@ -1292,7 +1367,7 @@
                             <p style="margin: 4px 0;"><strong>Destino / Setor:</strong> ${req.userSector}</p>
                         </div>
                         <div style="text-align: right;">
-                            <p style="margin: 4px 0;"><strong>No. Controle:</strong> OF-${req.id.toString().slice(-6)}</p>
+                            <p style="margin: 4px 0;"><strong>No. Controle:</strong> OF-${req.id.slice(-6)}</p>
                             <p style="margin: 4px 0;"><strong>Data de Processamento:</strong> ${req.dateProcessed || req.date}</p>
                         </div>
                     </div>
@@ -1360,34 +1435,16 @@
                 return;
             }
 
-            // Atualiza a senha na sessão ativa
-            state.currentUser.password = novaSenha;
-
-            // Atualiza a senha na lista de usuários do LocalStorage
-            const usuarioOriginal = state.users.find(u => u.id === state.currentUser.id);
-            if (usuarioOriginal) {
-                usuarioOriginal.password = novaSenha;
-            }
-
-            saveState();
-            fecharModalSenha();
-            
-            // Oculta o banner de aviso
-            document.getElementById('alerta-senha-padrao').classList.add('hidden');
-            
-            alert("Sua senha foi atualizada com sucesso!");
-        }
-
-        // Soft Delete Individual
-        function excluirSolicitacaoLogica(id) {
-            if (confirm("Tem certeza que deseja ocultar esta solicitação do histórico?")) {
-                const req = state.requests.find(r => r.id === id);
-                if (req) {
-                    req.ativo = false; 
+            // Atualiza a senha no Firestore
+            db.collection("users").doc(state.currentUser.id).update({ password: novaSenha })
+                .then(() => {
+                    state.currentUser.password = novaSenha;
                     saveState();
-                    renderHistorico();
-                }
-            }
+                    fecharModalSenha();
+                    document.getElementById('alerta-senha-padrao').classList.add('hidden');
+                    alert("Sua senha foi atualizada com sucesso!");
+                })
+                .catch(err => alert("Erro ao atualizar senha: " + err.message));
         }
 
         // --- GERAÇÃO DE CÓDIGO EXCLUSIVO PARA O MATERIAL ---
@@ -1404,6 +1461,7 @@
 
         // Inicialização do Sistema ao carregar
         window.onload = function() {
+            iniciarEscutasFirebase();
             setSession();
         };
     </script>
