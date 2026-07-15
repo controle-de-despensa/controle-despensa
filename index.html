@@ -387,13 +387,13 @@
         // ⚠️ ATENÇÃO: COLE AS SUAS CREDENCIAIS DO FIREBASE LOGO ABAIXO:
         // ============================================================
         const firebaseConfig = {
-  apiKey: "AIzaSyDjZMvdBPNnAFQGeE8NzqHJVmjwqJqWbpQ",
-  authDomain: "controle-despensa-6be07.firebaseapp.com",
-  projectId: "controle-despensa-6be07",
-  storageBucket: "controle-despensa-6be07.firebasestorage.app",
-  messagingSenderId: "520799843128",
-  appId: "1:520799843128:web:835b9f685264c9ffd887cd"
-};
+            apiKey: "AIzaSyDjZMvdBPNnAFQGeE8NzqHJVmjwqJqWbpQ",
+            authDomain: "controle-despensa-6be07.firebaseapp.com",
+            projectId: "controle-despensa-6be07",
+            storageBucket: "controle-despensa-6be07.firebasestorage.app",
+            messagingSenderId: "520799843128",
+            appId: "1:520799843128:web:835b9f685264c9ffd887cd"
+        };
         // ============================================================
 
         // Inicializar Firebase
@@ -838,7 +838,7 @@
 
             const newUser = {
                 name: nomeInput.value.trim(),
-                sector: setorInput.value.trim(), // CORRIGIDO: De sectorInput para setorInput[cite: 4]
+                sector: setorInput.value.trim(), 
                 username: loginTrimmed,
                 password: userPass.value,
                 role: userRole.value
@@ -856,10 +856,6 @@
                 })
                 .catch(err => alert("Erro ao cadastrar usuário: " + err.message));
         }
-
-        // ============================================================
-        // O restante do arquivo continua idêntico abaixo
-        // ============================================================
 
         function removerUsuario(id) {
             if (state.currentUser && state.currentUser.id === id) {
@@ -984,6 +980,15 @@
                 } else {
                     alert("Por favor, digite um número válido.");
                 }
+            }
+        }
+
+        // --- EXCLUIR MATERIAL (ADICIONADA) ---
+        function excluirMaterial(id) {
+            if (confirm("Tem certeza que deseja excluir permanentemente este material do estoque?")) {
+                db.collection("materials").doc(id).delete()
+                    .then(() => alert("Material excluído com sucesso!"))
+                    .catch(err => alert("Erro ao excluir material: " + err.message));
             }
         }
 
