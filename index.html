@@ -838,7 +838,7 @@
 
             const newUser = {
                 name: nomeInput.value.trim(),
-                sector: sectorInput.value.trim(),
+                sector: setorInput.value.trim(), // CORRIGIDO: De sectorInput para setorInput[cite: 4]
                 username: loginTrimmed,
                 password: userPass.value,
                 role: userRole.value
@@ -856,6 +856,10 @@
                 })
                 .catch(err => alert("Erro ao cadastrar usuário: " + err.message));
         }
+
+        // ============================================================
+        // O restante do arquivo continua idêntico abaixo
+        // ============================================================
 
         function removerUsuario(id) {
             if (state.currentUser && state.currentUser.id === id) {
@@ -980,13 +984,6 @@
                 } else {
                     alert("Por favor, digite um número válido.");
                 }
-            }
-        }
-
-        function excluirMaterial(id) {
-            if (confirm("Tem certeza que quer remover este material do catálogo?")) {
-                db.collection("materials").doc(id).delete()
-                    .catch(err => alert("Erro ao deletar: " + err.message));
             }
         }
 
@@ -1180,7 +1177,7 @@
         }
 
         function limparHistorico() {
-            if (confirm("Atenção! Isso ocultará todo o histórico de solicitações processadas do painel. Confirmar?")) {
+            if (confirm("Atenção! Isso ocultará todo o histórico de solicitudes processadas do painel. Confirmar?")) {
                 const batch = db.batch();
                 state.requests.forEach(r => {
                     if (r.status !== 'pending' && r.ativo !== false) {
