@@ -1,0 +1,1411 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sistema de Despensa & Almoxarifado</title>
+    <!-- Tailwind CSS para design moderno e limpo -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* Estilos específicos para impressão */
+        @media print {
+            body > *:not(#print-area) {
+                display: none !important;
+            }
+            #print-area {
+                display: block !important;
+                position: absolute;
+                left: 0;
+                top: 0;
+                width: 100%;
+                color: #000;
+            }
+            .no-print {
+                display: none !important;
+            }
+        }
+    </style>
+</head>
+<body class="bg-gray-50 font-sans text-gray-800 min-h-screen flex flex-col">
+
+    <!-- TELA DE LOGIN -->
+    <div id="login-screen" class="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
+        <div class="bg-white rounded-2xl shadow-2xl border border-gray-100 p-8 w-full max-w-md transform transition-all">
+            <div class="text-center mb-6">
+                <span class="text-5xl">📦</span>
+                <h2 class="text-2xl font-extrabold text-blue-900 mt-3">Acesso ao Sistema</h2>
+                <p class="text-xs text-gray-500 mt-1 uppercase tracking-wider font-semibold">Controle de Despensa & Almoxarifado</p>
+            </div>
+            
+            <form id="form-login" onsubmit="realizarLogin(event)" class="space-y-4">
+                <div>
+                    <label class="block text-xs font-bold text-gray-700 uppercase mb-1">Usuário de Acesso</label>
+                    <input type="text" id="login-username" required placeholder="Ex: admin" class="w-full bg-gray-50 border border-gray-300 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-blue-500 outline-none transition-all">
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-gray-700 uppercase mb-1">Senha</label>
+                    <input type="password" id="login-password" required placeholder="Digite sua senha" class="w-full bg-gray-50 border border-gray-300 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-blue-500 outline-none transition-all">
+                </div>
+                <button type="submit" class="w-full bg-blue-700 hover:bg-blue-800 text-white font-bold py-3 rounded-lg shadow-md hover:shadow-lg transition-all flex justify-center items-center gap-2">
+                    <span>🔑</span> Entrar no Sistema
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Topo / Cabeçalho -->
+    <header class="bg-blue-800 text-white shadow-md no-print">
+        <div class="container mx-auto px-4 py-4 flex flex-col sm:flex-row justify-between items-center gap-4">
+            <div class="flex items-center gap-3">
+                <span class="text-2xl">📦</span>
+                <div>
+                    <h1 class="text-xl font-bold leading-tight">Controle de Despensa</h1>
+                    <p class="text-xs text-blue-200">Gestão de Demandas & Almoxarifado</p>
+                </div>
+            </div>
+            
+            <!-- Perfil Conectado -->
+            <div class="flex items-center gap-4">
+                <div class="text-right">
+                    <p class="text-xs text-blue-200">Usuário conectado:</p>
+                    <p id="header-user-info" class="text-sm font-semibold text-white">-</p>
+                </div>
+                <button onclick="realizarLogout()" class="bg-red-600 hover:bg-red-700 text-white text-xs font-bold py-1.5 px-3 rounded-lg transition-all">
+                    Sair
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- Menu de Navegação (Abas) -->
+    <nav class="bg-white border-b border-gray-200 shadow-sm no-print">
+        <div class="container mx-auto px-4">
+            <div class="flex overflow-x-auto space-x-1 py-2" id="nav-tabs">
+                <!-- Abas geradas dinamicamente pelo JS -->
+            </div>
+        </div>
+    </nav>
+
+    <!-- Área de Conteúdo Principal -->
+    <main class="container mx-auto px-4 py-6 flex-grow no-print">
+        
+        <!-- ================= ALERTA DE SENHA PADRÃO ================= -->
+        <div id="alerta-senha-padrao" class="hidden mb-6">
+            <div class="bg-amber-50 border-l-4 border-amber-500 p-4 rounded-r-xl flex flex-col sm:flex-row justify-between items-center gap-3 shadow-sm border border-amber-200">
+                <div class="flex items-center gap-3">
+                    <span class="text-2xl">⚠️</span>
+                    <div>
+                        <p class="font-bold text-amber-800 text-sm">Sua conta está usando a senha padrão do sistema!</p>
+                        <p class="text-xs text-gray-600">Por segurança, altere sua senha para evitar acessos não autorizados.</p>
+                    </div>
+                </div>
+                <button onclick="abrirModalSenha()" class="bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold py-2 px-4 rounded-lg transition-all shadow-sm">
+                    Alterar Senha Agora
+                </button>
+            </div>
+        </div>
+        
+        <!-- ================= ABA: SOLICITAÇÃO ================= -->
+        <section id="pane-solicitacao" class="tab-pane hidden">
+            <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+                <!-- Lado Esquerdo: Formulário de Pedido com Justificativa -->
+                <div class="lg:col-span-4 bg-white p-5 rounded-xl border border-gray-200 shadow-sm flex flex-col justify-between">
+                    <div class="space-y-4">
+                        <h2 class="text-lg font-bold text-gray-900 flex items-center gap-2">
+                            <span>📝</span> Nova Solicitação
+                        </h2>
+                        
+                        <!-- Identificação Automática do Solicitante -->
+                        <div class="bg-blue-50 border border-blue-200 rounded-lg p-3.5">
+                            <span class="block text-xs font-semibold text-blue-800 uppercase mb-1">Solicitante Identificado</span>
+                            <p id="solicitante-nome" class="text-sm font-bold text-gray-950">-</p>
+                            <p id="solicitante-setor" class="text-xs text-gray-600 mt-0.5">-</p>
+                        </div>
+
+                        <!-- Campo de Justificativa -->
+                        <div>
+                            <label class="block text-xs font-bold text-gray-700 uppercase mb-1">Justificativa do Pedido</label>
+                            <textarea id="solicitacao-justificativa" placeholder="Descreva aqui o motivo ou para onde serão destinados esses materiais..." rows="3" required class="w-full bg-gray-50 border border-gray-300 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-blue-500 outline-none transition-all resize-none"></textarea>
+                        </div>
+
+                        <div>
+                            <h3 class="text-xs font-semibold text-gray-600 uppercase mb-2">Itens Selecionados</h3>
+                            <div id="carrinho-vazio" class="text-sm text-gray-400 py-6 text-center border-2 border-dashed border-gray-200 rounded-lg">
+                                Nenhum material adicionado ainda.<br>Clique nos itens da lista ao lado.
+                            </div>
+                            <ul id="carrinho-lista" class="space-y-2 max-h-48 overflow-y-auto pr-1">
+                                <!-- Itens adicionados aparecem aqui -->
+                            </ul>
+                        </div>
+                    </div>
+
+                    <div class="pt-4 border-t border-gray-100 mt-4">
+                        <button onclick="enviarSolicitacao()" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-semibold py-3 px-4 rounded-lg shadow-md transition-all flex justify-center items-center gap-2">
+                            <span>🚀</span> Enviar Solicitação
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Lado Direito: Catálogo de Materiais -->
+                <div class="lg:col-span-8 bg-white p-5 rounded-xl border border-gray-200 shadow-sm">
+                    <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-4">
+                        <div>
+                            <h2 class="text-lg font-bold text-gray-900">Catálogo de Materiais</h2>
+                            <p class="text-xs text-gray-500">Selecione os materiais e defina a quantidade necessária</p>
+                        </div>
+                        <input type="text" id="busca-material" oninput="renderCatalogo()" placeholder="Buscar material..." class="w-full sm:w-64 bg-gray-50 border border-gray-300 rounded-lg px-3 py-1.5 text-sm focus:ring-2 focus:ring-blue-500 outline-none">
+                    </div>
+
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left border-collapse text-sm">
+                            <thead>
+                                <tr class="bg-gray-50 text-gray-600 uppercase text-xs font-semibold border-b border-gray-200">
+                                    <th class="py-3 px-4">Material</th>
+                                    <th class="py-3 px-4 text-center">Unidade</th>
+                                    <th class="py-3 px-4 text-center col-saldo">Saldo Disponível</th>
+                                    <th class="py-3 px-4 text-center">Ação</th>
+                                </tr>
+                            </thead>
+                            <tbody id="catalogo-tbody" class="divide-y divide-gray-100">
+                                <!-- Injetado via JS -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ================= ABA: USUÁRIOS (ADMIN) ================= -->
+        <section id="pane-usuarios" class="tab-pane hidden">
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <!-- Cadastro -->
+                <div class="bg-white p-5 rounded-xl border border-gray-200 shadow-sm h-fit">
+                    <h2 class="text-lg font-bold text-gray-900 mb-4 flex items-center gap-2">
+                        <span>👤</span> Cadastrar Novo Usuário
+                    </h2>
+                    <form id="form-usuario" onsubmit="cadastrarUsuario(event)" class="space-y-4">
+                        <div>
+                            <label class="block text-xs font-semibold text-gray-600 uppercase mb-1">Nome Completo</label>
+                            <input type="text" id="user-nome" required placeholder="Ex: João Silva" class="w-full bg-gray-50 border border-gray-300 rounded-lg p-2.5 focus:ring-2 focus:ring-blue-500 outline-none">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-gray-600 uppercase mb-1">Departamento / Setor</label>
+                            <input type="text" id="user-setor" required placeholder="Ex: Administrativo" class="w-full bg-gray-50 border border-gray-300 rounded-lg p-2.5 focus:ring-2 focus:ring-blue-500 outline-none">
+                        </div>
+                        <div class="grid grid-cols-2 gap-2">
+                            <div>
+                                <label class="block text-xs font-semibold text-gray-600 uppercase mb-1">Usuário (Login)</label>
+                                <input type="text" id="user-username" required placeholder="Ex: joao.silva" class="w-full bg-gray-50 border border-gray-300 rounded-lg p-2.5 focus:ring-2 focus:ring-blue-500 outline-none">
+                            </div>
+                            <div>
+                                <label class="block text-xs font-semibold text-gray-600 uppercase mb-1">Senha</label>
+                                <input type="password" id="user-password" required placeholder="Sua senha" class="w-full bg-gray-50 border border-gray-300 rounded-lg p-2.5 focus:ring-2 focus:ring-blue-500 outline-none">
+                            </div>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-gray-600 uppercase mb-1">Perfil de Acesso</label>
+                            <select id="user-role" required class="w-full bg-gray-50 border border-gray-300 rounded-lg p-2.5 focus:ring-2 focus:ring-blue-500 outline-none">
+                                <option value="user">Funcionário (Apenas Solicitar)</option>
+                                <option value="admin">Administrador (Controle Total)</option>
+                            </select>
+                        </div>
+                        <button type="submit" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2.5 rounded-lg transition-all">
+                            Cadastrar Usuário
+                        </button>
+                    </form>
+                </div>
+                <!-- Lista -->
+                <div class="lg:col-span-2 bg-white p-5 rounded-xl border border-gray-200 shadow-sm">
+                    <h2 class="text-lg font-bold text-gray-900 mb-4">Usuários Habilitados</h2>
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left border-collapse text-sm">
+                            <thead>
+                                <tr class="bg-gray-50 text-gray-600 uppercase text-xs font-semibold border-b border-gray-200">
+                                    <th class="py-3 px-4">Nome</th>
+                                    <th class="py-3 px-4">Setor / Área</th>
+                                    <th class="py-3 px-4">Login</th>
+                                    <th class="py-3 px-4 text-center">Perfil</th>
+                                    <th class="py-3 px-4 text-center">Ações</th>
+                                </tr>
+                            </thead>
+                            <tbody id="usuarios-tbody" class="divide-y divide-gray-100">
+                                <!-- Injetado via JS -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ================= ABA: MATERIAIS (ADMIN) ================= -->
+        <section id="pane-materiais" class="tab-pane hidden">
+            <!-- Cadastro em Massa -->
+            <div class="bg-white p-5 rounded-xl border border-gray-200 shadow-sm mb-6">
+                <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-4">
+                    <div>
+                        <h2 class="text-lg font-bold text-gray-900 flex items-center gap-2">
+                            <span>📦</span> Cadastro de Materiais
+                        </h2>
+                        <p class="text-xs text-gray-500">Cadastre múltiplos materiais de uma vez preenchendo as linhas desejadas.</p>
+                    </div>
+                    <button type="button" onclick="addMaterialInputRow()" class="bg-blue-50 hover:bg-blue-100 text-blue-700 font-semibold px-4 py-2 rounded-lg text-xs transition-all border border-blue-200">
+                        + Adicionar Outra Linha
+                    </button>
+                </div>
+
+                <form id="form-materiais-massa" onsubmit="salvarMateriaisMassa(event)">
+                    <div class="overflow-x-auto mb-4">
+                        <table class="w-full text-left border-collapse text-sm min-w-[600px]">
+                            <thead>
+                                <tr class="bg-gray-50 text-gray-600 uppercase text-xs font-semibold border-b border-gray-200">
+                                    <th class="py-2.5 px-3 w-7/12">Nome do Material</th>
+                                    <th class="py-2.5 px-3 w-2/12 text-center">Unidade (Ex: Un, Pacote, Cx)</th>
+                                    <th class="py-2.5 px-3 w-2/12 text-center">Saldo Inicial</th>
+                                    <th class="py-2.5 px-3 w-1/12 text-center">Remover</th>
+                                </tr>
+                            </thead>
+                            <tbody id="materiais-massa-tbody">
+                                <!-- Linhas de cadastro dinâmico -->
+                            </tbody>
+                        </table>
+                    </div>
+                    <div class="flex justify-end">
+                        <button type="submit" class="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold px-6 py-2.5 rounded-lg shadow-md transition-all">
+                            Gravar Todos os Materiais
+                        </button>
+                    </div>
+                </form>
+            </div>
+
+            <!-- Listagem e Botão de Impressão -->
+            <div class="bg-white p-5 rounded-xl border border-gray-200 shadow-sm">
+                <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-4">
+                    <h2 class="text-lg font-bold text-gray-900">Estoque Atualizado</h2>
+                    <button onclick="imprimirEstoqueCompleto()" class="bg-gray-800 hover:bg-gray-950 text-white font-semibold px-4 py-2 rounded-lg text-xs flex items-center gap-2 shadow-sm transition-all">
+                        <span>🖨️</span> Imprimir Relatório de Saldos
+                    </button>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left border-collapse text-sm">
+                        <thead>
+                            <tr class="bg-gray-50 text-gray-600 uppercase text-xs font-semibold border-b border-gray-200">
+                                <th class="py-3 px-4 w-2/12">Código</th>
+                                <th class="py-3 px-4 w-5/12">Material</th>
+                                <th class="py-3 px-4 text-center w-2/12">Unidade</th>
+                                <th class="py-3 px-4 text-center w-1/12">Saldo Físico</th>
+                                <th class="py-3 px-4 text-center w-2/12">Ações</th>
+                            </tr>
+                        </thead>
+                        <tbody id="estoque-tbody" class="divide-y divide-gray-100">
+                            <!-- Injetado via JS -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+
+        <!-- ================= ABA: PENDENTES (ADMIN) ================= -->
+        <section id="pane-pendentes" class="tab-pane hidden">
+            <div class="bg-white p-5 rounded-xl border border-gray-200 shadow-sm">
+                <h2 class="text-lg font-bold text-gray-900 mb-4">Solicitações Aguardando Liberação</h2>
+                <div id="lista-pendentes" class="space-y-6">
+                    <!-- Cards de solicitações pendentes injetados via JS -->
+                </div>
+            </div>
+        </section>
+
+        <!-- ================= ABA: HISTÓRICO (ADMIN) ================= -->
+        <section id="pane-historico" class="tab-pane hidden">
+            <div class="bg-white p-5 rounded-xl border border-gray-200 shadow-sm">
+                <div class="flex justify-between items-center mb-4">
+                    <h2 class="text-lg font-bold text-gray-900">Histórico de Pedidos Processados</h2>
+                    <button onclick="limparHistorico()" class="text-xs text-red-500 hover:text-red-700 font-semibold">
+                        Limpar Histórico
+                    </button>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left border-collapse text-sm">
+                        <thead>
+                            <tr class="bg-gray-50 text-gray-600 uppercase text-xs font-semibold border-b border-gray-200">
+                                <th class="py-3 px-4">Data/Hora</th>
+                                <th class="py-3 px-4">Solicitante</th>
+                                <th class="py-3 px-4">Setor</th>
+                                <th class="py-3 px-4">Itens Pedidos / Justificativa</th>
+                                <th class="py-3 px-4 text-center">Status</th>
+                                <th class="py-3 px-4 text-center">Documentos</th>
+                            </tr>
+                        </thead>
+                        <tbody id="historico-tbody" class="divide-y divide-gray-100">
+                            <!-- Injetado via JS -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+
+    </main>
+
+    <!-- Rodapé -->
+    <footer class="bg-white border-t border-gray-200 py-4 text-center text-xs text-gray-500 mt-auto no-print">
+        <p>Sistema de Gestão de Despensa • HTML5 & Local Storage • 2026</p>
+    </footer>
+
+    <!-- ================= MODAL DE ALTERAÇÃO DE SENHA ================= -->
+    <div id="modal-senha" class="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm hidden items-center justify-center p-4">
+        <div class="bg-white rounded-2xl shadow-2xl border border-gray-100 p-6 w-full max-w-md">
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="text-lg font-bold text-blue-900">🔒 Alterar Minha Senha</h3>
+                <button onclick="fecharModalSenha()" class="text-gray-400 hover:text-gray-600 text-lg">✕</button>
+            </div>
+            <form id="form-alterar-senha" onsubmit="salvarNovaSenha(event)" class="space-y-4">
+                <div>
+                    <label class="block text-xs font-bold text-gray-700 uppercase mb-1">Nova Senha</label>
+                    <input type="password" id="nova-senha-input" required placeholder="Mínimo 4 caracteres" class="w-full bg-gray-50 border border-gray-300 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-blue-500 outline-none transition-all">
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-gray-700 uppercase mb-1">Confirme a Nova Senha</label>
+                    <input type="password" id="confirma-senha-input" required placeholder="Repita a senha" class="w-full bg-gray-50 border border-gray-300 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-blue-500 outline-none transition-all">
+                </div>
+                <button type="submit" class="w-full bg-blue-700 hover:bg-blue-800 text-white font-bold py-3 rounded-lg shadow-md transition-all">
+                    Salvar Nova Senha
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Área Oculta na tela para processamento de impressão -->
+    <div id="print-area" class="hidden"></div>
+
+    <!-- Script de Funcionamento Interno -->
+    <script>
+        // Lista padrão nova para migrar bancos antigos
+        const defaultUsers = [
+            { id: 1, name: 'Administrador', sector: 'TI & Almoxarifado', username: 'admin', password: '123', role: 'admin' },
+            { id: 2, name: 'Ana Souza', sector: 'Cozinha Principal', username: 'ana', password: '123', role: 'user' },
+            { id: 3, name: 'Carlos Santos', sector: 'Refeitório Administrativo', username: 'carlos', password: '123', role: 'user' }
+        ];
+
+        // --- SISTEMA AUTO-REPARADOR DE MEMÓRIA (MIGRAÇÃO) ---
+        let currentSaved = localStorage.getItem('dep_users');
+        if (currentSaved) {
+            try {
+                let parsed = JSON.parse(currentSaved);
+                if (parsed.length > 0 && !parsed[0].hasOwnProperty('username')) {
+                    localStorage.setItem('dep_users', JSON.stringify(defaultUsers));
+                }
+            } catch (e) {
+                localStorage.setItem('dep_users', JSON.stringify(defaultUsers));
+            }
+        } else {
+            localStorage.setItem('dep_users', JSON.stringify(defaultUsers));
+        }
+
+        // Dados Estruturais do Sistema
+        let state = {
+            // USANDO SESSION STORAGE AQUI: se a aba fechar, o usuário é limpo!
+            currentUser: JSON.parse(sessionStorage.getItem('dep_current_user')) || null,
+            currentTab: 'solicitacao',
+            users: JSON.parse(localStorage.getItem('dep_users')),
+            materials: JSON.parse(localStorage.getItem('dep_materials')) || [
+                { id: 1, code: 'MAT-1502', name: 'Arroz Agulhinha Tipo 1', unit: 'Saco 5kg', balance: 15 },
+                { id: 2, code: 'MAT-3829', name: 'Azeite de Oliva Extra Virgem', unit: 'Garrafa 500ml', balance: 8 },
+                { id: 3, code: 'MAT-8291', name: 'Açúcar Refinado', unit: 'Pct 1kg', balance: 30 },
+                { id: 4, code: 'MAT-4721', name: 'Café Torrado e Moído', unit: 'Vácuo 500g', balance: 12 },
+                { id: 5, code: 'MAT-9031', name: 'Detergente Neutro Concentrado', unit: 'Frasco 500ml', balance: 25 }
+            ],
+            requests: JSON.parse(localStorage.getItem('dep_requests')) || [],
+            cart: [] 
+        };
+
+        // Salvar estado localmente
+        function saveState() {
+            localStorage.setItem('dep_users', JSON.stringify(state.users));
+            localStorage.setItem('dep_materials', JSON.stringify(state.materials));
+            localStorage.setItem('dep_requests', JSON.stringify(state.requests));
+            
+            // Grava a sessão do usuário ativo apenas na sessão do navegador (fecha a aba = apaga)
+            if (state.currentUser) {
+                sessionStorage.setItem('dep_current_user', JSON.stringify(state.currentUser));
+            } else {
+                sessionStorage.removeItem('dep_current_user');
+            }
+        }
+
+        // ================= SISTEMA DE LOGIN E CONTROLE DE ACESSO =================
+
+        function realizarLogin(e) {
+            e.preventDefault();
+            const userVal = document.getElementById('login-username').value.trim().toLowerCase();
+            const passVal = document.getElementById('login-password').value;
+
+            const matchUser = state.users.find(u => u.username.toLowerCase() === userVal && u.password === passVal);
+
+            if (matchUser) {
+                state.currentUser = matchUser;
+                saveState();
+                
+                document.getElementById('login-username').value = '';
+                document.getElementById('login-password').value = '';
+                
+                setSession();
+            } else {
+                alert("Usuário ou senha inválidos. Tente novamente!");
+            }
+        }
+
+        // Realizar logout de forma limpa
+        function realizarLogout() {
+            state.currentUser = null;
+            state.cart = [];
+            sessionStorage.removeItem('dep_current_user'); // Limpa da sessão
+            
+            const loginScreen = document.getElementById('login-screen');
+            loginScreen.classList.remove('hidden');
+        }
+
+        function setSession() {
+            const loginScreen = document.getElementById('login-screen');
+            
+            if (!state.currentUser) {
+                loginScreen.classList.remove('hidden');
+                document.getElementById('alerta-senha-padrao').classList.add('hidden');
+                return;
+            }
+
+            loginScreen.classList.add('hidden');
+            document.getElementById('header-user-info').innerText = `${state.currentUser.name} [${state.currentUser.sector}]`;
+
+            // ALERTA DE SENHA PADRÃO: Mostra o banner se a senha atual for a provisória '123'
+            if (state.currentUser.password === '123') {
+                document.getElementById('alerta-senha-padrao').classList.remove('hidden');
+            } else {
+                document.getElementById('alerta-senha-padrao').classList.add('hidden');
+            }
+
+            state.currentTab = 'solicitacao';
+            renderTabsMenu();
+            switchTab(state.currentTab);
+        }
+
+        function renderTabsMenu() {
+            if (!state.currentUser) return;
+            const nav = document.getElementById('nav-tabs');
+            const pendingCount = state.requests.filter(r => r.status === 'pending').length;
+            
+            const tabs = [
+                { id: 'solicitacao', label: '📝 Fazer Solicitação', adminOnly: false },
+                { id: 'usuarios', label: '👤 Usuários', adminOnly: true },
+                { id: 'materiais', label: '📦 Materiais (Almoxarifado)', adminOnly: true },
+                { id: 'pendentes', label: '⏳ Pendentes', adminOnly: true, badge: pendingCount },
+                { id: 'historico', label: '📜 Histórico', adminOnly: true }
+            ];
+
+            let html = '';
+            tabs.forEach(tab => {
+                if (tab.adminOnly && state.currentUser.role !== 'admin') return;
+
+                const isActive = state.currentTab === tab.id;
+                const activeClasses = isActive 
+                    ? "border-blue-600 text-blue-600 border-b-2 font-semibold" 
+                    : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 border-b-2";
+
+                html += `
+                    <button onclick="switchTab('${tab.id}')" class="whitespace-nowrap py-3 px-4 text-sm font-medium transition-all duration-150 flex items-center gap-2 relative ${activeClasses}">
+                        ${tab.label}
+                        ${tab.badge && tab.badge > 0 ? `
+                            <span class="absolute top-2 right-0 bg-red-500 text-white text-[10px] font-bold rounded-full h-5 w-5 flex items-center justify-center animate-pulse">
+                                ${tab.badge}
+                            </span>
+                        ` : ''}
+                    </button>
+                `;
+            });
+            nav.innerHTML = html;
+        }
+
+        function switchTab(tabId) {
+            state.currentTab = tabId;
+            document.querySelectorAll('.tab-pane').forEach(el => el.classList.add('hidden'));
+            
+            const activePane = document.getElementById(`pane-${tabId}`);
+            if (activePane) activePane.classList.remove('hidden');
+
+            renderTabsMenu();
+
+            if (tabId === 'solicitacao') {
+                renderCatalogo();
+                renderCarrinho();
+                updateSolicitanteDisplay();
+            } else if (tabId === 'usuarios') {
+                renderUsuariosList();
+            } else if (tabId === 'materiais') {
+                renderEstoqueList();
+                const tbody = document.getElementById('materiais-massa-tbody');
+                if (tbody.children.length === 0) {
+                    tbody.innerHTML = '';
+                    addMaterialInputRow();
+                }
+            } else if (tabId === 'pendentes') {
+                renderPendentes();
+            } else if (tabId === 'historico') {
+                renderHistorico();
+            }
+        }
+
+        // ================= FUNÇÕES: ABA SOLICITAÇÃO =================
+
+        function updateSolicitanteDisplay() {
+            if (state.currentUser) {
+                document.getElementById('solicitante-nome').innerText = state.currentUser.name;
+                document.getElementById('solicitante-setor').innerText = `Setor: ${state.currentUser.sector}`;
+            }
+        }
+
+        function renderCatalogo() {
+            if (!state.currentUser) return;
+            const query = document.getElementById('busca-material').value.toLowerCase();
+            const tbody = document.getElementById('catalogo-tbody');
+            
+            const colsSaldo = document.querySelectorAll('.col-saldo');
+            colsSaldo.forEach(el => {
+                el.style.display = state.currentUser.role === 'admin' ? '' : 'none';
+            });
+
+            const filtered = state.materials.filter(m => m.name.toLowerCase().includes(query));
+            
+            if (filtered.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="4" class="py-8 text-center text-gray-400">Nenhum material encontrado no estoque.</td></tr>`;
+                return;
+            }
+
+            let html = '';
+            filtered.forEach(m => {
+                const inCart = state.cart.find(item => item.materialId === m.id);
+                const buttonHtml = inCart 
+                    ? `<span class="bg-blue-100 text-blue-800 text-xs font-semibold px-2.5 py-1 rounded-full">Na lista</span>`
+                    : `<button onclick="addToCart(${m.id})" class="bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold py-1 px-3 rounded shadow transition-all">Selecionar</button>`;
+
+                html += `
+                    <tr class="hover:bg-gray-50 transition-colors">
+                        <td class="py-3 px-4 font-medium text-gray-950">
+                            <span class="text-[11px] font-mono bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded mr-2 font-semibold">${m.code || 'S/C'}</span>
+                            ${m.name}
+                        </td>
+                        <td class="py-3 px-4 text-center text-gray-500">${m.unit}</td>
+                        <td class="py-3 px-4 text-center font-bold text-gray-700 col-saldo" style="display: ${state.currentUser.role === 'admin' ? '' : 'none'}">${m.balance}</td>
+                        <td class="py-3 px-4 text-center">${buttonHtml}</td>
+                    </tr>
+                `;
+            });
+            tbody.innerHTML = html;
+        }
+
+        function addToCart(materialId) {
+            state.cart.push({ materialId: materialId, qty: 1 });
+            renderCarrinho();
+            renderCatalogo();
+        }
+
+        // ================= FUNÇÕES: ABA USUÁRIOS (ADMIN) =================
+
+        function renderUsuariosList() {
+            const tbody = document.getElementById('usuarios-tbody');
+            if (state.users.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="5" class="py-8 text-center text-gray-400">Nenhum usuário cadastrado.</td></tr>`;
+                return;
+            }
+
+            let html = '';
+            state.users.forEach(user => {
+                const isCurrentUser = state.currentUser && state.currentUser.id === user.id;
+                
+                const deleteAction = isCurrentUser 
+                    ? `<span class="text-xs text-gray-400 italic font-semibold">Sua Conta</span>`
+                    : `<button onclick="removerUsuario(${user.id})" class="text-red-500 hover:text-red-700 hover:underline text-xs">Excluir</button>`;
+                
+                const badgePerfil = user.role === 'admin' 
+                    ? `<span class="bg-blue-100 text-blue-800 font-bold text-[10px] px-2 py-0.5 rounded-full uppercase">Admin</span>`
+                    : `<span class="bg-slate-100 text-slate-800 font-semibold text-[10px] px-2 py-0.5 rounded-full uppercase">Funcionário</span>`;
+
+                html += `
+                    <tr class="hover:bg-gray-50">
+                        <td class="py-3 px-4 font-medium text-gray-900">${user.name}</td>
+                        <td class="py-3 px-4 text-gray-600">${user.sector}</td>
+                        <td class="py-3 px-4 text-gray-600 font-mono text-xs font-bold">${user.username}</td>
+                        <td class="py-3 px-4 text-center">${badgePerfil}</td>
+                        <td class="py-3 px-4 text-center">
+                            ${deleteAction}
+                        </td>
+                    </tr>
+                `;
+            });
+            tbody.innerHTML = html;
+        }
+
+        function updateCartQty(materialId, value) {
+            const item = state.cart.find(c => c.materialId === materialId);
+            if (item) {
+                item.qty = Math.max(1, parseInt(value) || 1);
+            }
+        }
+
+        function removeFromCart(materialId) {
+            state.cart = state.cart.filter(c => c.materialId !== materialId);
+            renderCarrinho();
+            renderCatalogo();
+        }
+
+        function renderCarrinho() {
+            const list = document.getElementById('carrinho-lista');
+            const empty = document.getElementById('carrinho-vazio');
+
+            if (state.cart.length === 0) {
+                list.innerHTML = '';
+                empty.classList.remove('hidden');
+                return;
+            }
+
+            empty.classList.add('hidden');
+            let html = '';
+            state.cart.forEach(item => {
+                const material = state.materials.find(m => m.id === item.materialId);
+                if (!material) return;
+
+                html += `
+                    <li class="flex items-center justify-between bg-gray-50 p-3 rounded-lg border border-gray-200 gap-2">
+                        <div class="flex-grow min-w-0">
+                            <p class="text-sm font-semibold text-gray-800 truncate">
+                                <span class="font-mono text-xs text-gray-500 mr-1">[${material.code || 'S/C'}]</span>
+                                ${material.name}
+                            </p>
+                            <span class="text-xs text-gray-500">${material.unit}</span>
+                        </div>
+                        <div class="flex items-center gap-1.5 flex-shrink-0">
+                            <input type="number" min="1" value="${item.qty}" onchange="updateCartQty(${material.id}, this.value)" class="w-16 text-center bg-white border border-gray-300 rounded p-1 text-sm font-medium focus:ring-1 focus:ring-blue-500 outline-none">
+                            <button onclick="removeFromCart(${material.id})" class="text-red-500 hover:text-red-700 hover:bg-red-50 p-1 rounded transition-all" title="Remover">
+                                🗑️
+                            </button>
+                        </div>
+                    </li>
+                `;
+            });
+            list.innerHTML = html;
+        }
+
+        function enviarSolicitacao() {
+            if (!state.currentUser) {
+                alert("Erro de sessão: Faça login novamente.");
+                realizarLogout();
+                return;
+            }
+
+            if (state.cart.length === 0) {
+                alert("Adicione pelo menos um material à sua lista antes de enviar.");
+                return;
+            }
+
+            const justificativaInput = document.getElementById('solicitacao-justificativa');
+            const justificativaText = justificativaInput.value.trim();
+
+            if (!justificativaText) {
+                alert("Por favor, preencha a justificativa explicando a finalidade da solicitação.");
+                justificativaInput.focus();
+                return;
+            }
+
+            const newRequest = {
+                id: Date.now(),
+                userId: state.currentUser.id,
+                userName: state.currentUser.name,
+                userSector: state.currentUser.sector,
+                date: new Date().toLocaleString('pt-BR'),
+                status: 'pending',
+                justification: justificativaText,
+                items: state.cart.map(item => {
+                    const mat = state.materials.find(m => m.id === item.materialId);
+                    return {
+                        materialId: item.materialId,
+                        code: mat.code || 'S/C', 
+                        name: mat.name,
+                        unit: mat.unit,
+                        qtyRequested: item.qty
+                    };
+                })
+            };
+
+            state.requests.unshift(newRequest);
+            state.cart = []; 
+            justificativaInput.value = ''; 
+            saveState();
+            
+            renderCarrinho();
+            renderCatalogo();
+            renderTabsMenu(); 
+            
+            alert("Solicitação enviada com sucesso! Aguarde a liberação do administrador.");
+        }
+
+        // ================= FUNÇÕES: ABA USUÁRIOS (ADMIN) =================
+
+        function cadastrarUsuario(e) {
+            e.preventDefault();
+            const nomeInput = document.getElementById('user-nome');
+            const setorInput = document.getElementById('user-setor');
+            const userLogin = document.getElementById('user-username');
+            const userPass = document.getElementById('user-password');
+            const userRole = document.getElementById('user-role');
+
+            const loginTrimmed = userLogin.value.trim().toLowerCase();
+
+            const exists = state.users.some(u => u.username.toLowerCase() === loginTrimmed);
+            if (exists) {
+                alert("Este login de usuário já está sendo utilizado por outra pessoa. Escolha outro!");
+                return;
+            }
+
+            const newUser = {
+                id: Date.now(),
+                name: nomeInput.value.trim(),
+                sector: sectorInput.value.trim(),
+                username: loginTrimmed,
+                password: userPass.value,
+                role: userRole.value
+            };
+
+            state.users.push(newUser);
+            saveState();
+            
+            nomeInput.value = '';
+            setorInput.value = '';
+            userLogin.value = '';
+            userPass.value = '';
+            userRole.value = 'user';
+
+            renderUsuariosList();
+            alert("Novo usuário habilitado e configurado com sucesso!");
+        }
+
+        function removerUsuario(id) {
+            if (state.currentUser && state.currentUser.id === id) {
+                alert("Operação inválida. Você não pode deletar sua própria conta ativa!");
+                return;
+            }
+
+            if (confirm("Tem certeza que deseja excluir permanentemente este usuário do sistema?")) {
+                state.users = state.users.filter(u => u.id !== id);
+                saveState();
+                renderUsuariosList();
+            }
+        }
+
+        // ================= FUNÇÕES: ABA MATERIAIS (ADMIN) =================
+
+        function addMaterialInputRow() {
+            const tbody = document.getElementById('materiais-massa-tbody');
+            const rowId = Date.now() + Math.random().toString(36).substr(2, 5);
+            
+            const tr = document.createElement('tr');
+            tr.id = `m-row-${rowId}`;
+            tr.className = "hover:bg-gray-50 border-b border-gray-100";
+            tr.innerHTML = `
+                <td class="py-2 px-1">
+                    <input type="text" placeholder="Nome do Material (Ex: Arroz Tipo 1)" required class="w-full bg-white border border-gray-300 rounded px-3 py-1.5 text-sm focus:ring-1 focus:ring-blue-500 outline-none mat-name">
+                </td>
+                <td class="py-2 px-1">
+                    <input type="text" placeholder="Ex: Unidade, Saco 5kg" required class="w-full bg-white border border-gray-300 rounded px-3 py-1.5 text-sm focus:ring-1 focus:ring-blue-500 outline-none text-center mat-unit">
+                </td>
+                <td class="py-2 px-1">
+                    <input type="number" min="0" value="0" required class="w-full bg-white border border-gray-300 rounded px-3 py-1.5 text-sm focus:ring-1 focus:ring-blue-500 outline-none text-center mat-balance">
+                </td>
+                <td class="py-2 px-1 text-center">
+                    <button type="button" onclick="removeMaterialInputRow('${rowId}')" class="text-red-500 hover:text-red-700 hover:bg-red-50 p-1.5 rounded transition-all">🗑️</button>
+                </td>
+            `;
+            tbody.appendChild(tr);
+        }
+
+        function removeMaterialInputRow(rowId) {
+            const row = document.getElementById(`m-row-${rowId}`);
+            if (row) row.remove();
+        }
+
+        function salvarMateriaisMassa(e) {
+            e.preventDefault();
+            const tbody = document.getElementById('materiais-massa-tbody');
+            const rows = tbody.querySelectorAll('tr');
+            
+            if (rows.length === 0) {
+                alert("Adicione pelo menos uma linha para poder cadastrar.");
+                return;
+            }
+
+            let cadastrados = 0;
+            rows.forEach(row => {
+                const name = row.querySelector('.mat-name').value.trim();
+                const unit = row.querySelector('.mat-unit').value.trim();
+                const balance = parseInt(row.querySelector('.mat-balance').value) || 0;
+
+                if (name && unit) {
+                    state.materials.push({
+                        id: Date.now() + Math.random(),
+                        code: gerarCodigoMaterial(), 
+                        name: name,
+                        unit: unit,
+                        balance: balance
+                    });
+                    cadastrados++;
+                }
+            });
+
+            if (cadastrados > 0) {
+                saveState();
+                tbody.innerHTML = ''; 
+                addMaterialInputRow(); 
+                renderEstoqueList();
+                alert(`${cadastrados} materiais cadastrados com sucesso!`);
+            }
+        }
+
+        function renderEstoqueList() {
+            const tbody = document.getElementById('estoque-tbody');
+            if (state.materials.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="5" class="py-8 text-center text-gray-400">Nenhum material no almoxarifado.</td></tr>`;
+                return;
+            }
+
+            let html = '';
+            state.materials.forEach(mat => {
+                html += `
+                    <tr class="hover:bg-gray-50">
+                        <td class="py-3 px-4 font-mono text-xs font-bold text-blue-900">${mat.code || 'S/C'}</td>
+                        <td class="py-3 px-4 font-medium text-gray-900">${mat.name}</td>
+                        <td class="py-3 px-4 text-center text-gray-600">${mat.unit}</td>
+                        <td class="py-3 px-4 text-center font-bold text-blue-600">${mat.balance}</td>
+                        <td class="py-3 px-4 text-center">
+                            <button onclick="ajustarSaldo(${mat.id})" class="text-blue-600 hover:underline text-xs mr-3">Ajustar Saldo</button>
+                            <button onclick="excluirMaterial(${mat.id})" class="text-red-500 hover:underline text-xs">Excluir</button>
+                        </td>
+                    </tr>
+                `;
+            });
+            tbody.innerHTML = html;
+        }
+
+        // Ajustar o saldo físico no almoxarifado
+        function ajustarSaldo(id) {
+            const mat = state.materials.find(m => m.id === id);
+            if (!mat) return;
+
+            const novoSaldo = prompt(`Ajustar saldo físico de "${mat.name}". Atual: ${mat.balance}. Digite o novo saldo:`, mat.balance);
+            if (novoSaldo !== null) {
+                const valor = parseInt(novoSaldo);
+                if (!isNaN(valor) && valor >= 0) {
+                    mat.balance = valor;
+                    saveState();
+                    renderEstoqueList();
+                } else {
+                    alert("Por favor, digite um número válido e maior ou igual a zero.");
+                }
+            }
+        }
+
+        function excluirMaterial(id) {
+            if (confirm("Tem certeza que quer remover este material do catálogo?")) {
+                state.materials = state.materials.filter(m => m.id !== id);
+                saveState();
+                renderEstoqueList();
+            }
+        }
+
+        // ================= FUNÇÕES: ABA PENDENTES (ADMIN) =================
+
+        function renderPendentes() {
+            const container = document.getElementById('lista-pendentes');
+            const pendentes = state.requests.filter(r => r.status === 'pending');
+
+            if (pendentes.length === 0) {
+                container.innerHTML = `
+                    <div class="text-center py-12 text-gray-400 border border-dashed border-gray-200 rounded-xl">
+                        <span class="text-4xl mb-2 block">☕</span>
+                        Nenhuma solicitação aguardando aprovação no momento.
+                    </div>
+                `;
+                return;
+            }
+
+            let html = '';
+            pendentes.forEach(req => {
+                let itemsHtml = '';
+                req.items.forEach(item => {
+                    const originalMaterial = state.materials.find(m => m.id === item.materialId);
+                    const saldoAtual = originalMaterial ? originalMaterial.balance : 0;
+                    
+                    const faltaEstoque = item.qtyRequested > saldoAtual;
+                    const stockBadge = faltaEstoque 
+                        ? `<span class="text-red-600 font-bold text-xs bg-red-50 px-2 py-1 rounded">⚠️ Estoque Insuficiente (Saldo: ${saldoAtual})</span>`
+                        : `<span class="text-emerald-700 text-xs bg-emerald-50 px-2 py-1 rounded">✓ Disponível (Saldo: ${saldoAtual})</span>`;
+
+                    itemsHtml += `
+                        <tr class="border-b border-gray-100 text-sm">
+                            <td class="py-2.5 px-1 text-gray-800">
+                                <span class="font-mono text-xs text-slate-500 mr-2">[${item.code || 'S/C'}]</span>
+                                ${item.name}
+                            </td>
+                            <td class="py-2.5 px-1 text-center text-gray-500">${item.unit}</td>
+                            <td class="py-2.5 px-1 text-center font-bold text-gray-800">${item.qtyRequested}</td>
+                            <td class="py-2.5 px-1 text-right">${stockBadge}</td>
+                        </tr>
+                    `;
+                });
+
+                html += `
+                    <div class="bg-white border border-gray-200 shadow-sm rounded-xl overflow-hidden hover:border-gray-300 transition-all">
+                        <div class="bg-gray-50 border-b border-gray-200 p-4 flex flex-col sm:flex-row justify-between sm:items-center gap-3">
+                            <div>
+                                <h3 class="font-bold text-gray-900">${req.userName}</h3>
+                                <p class="text-xs text-gray-500">${req.userSector} • Solicitado em: ${req.date}</p>
+                            </div>
+                            <div class="flex gap-2">
+                                <button onclick="imprimirPedido(${req.id})" class="border border-gray-300 hover:bg-gray-100 text-gray-700 font-medium text-xs px-3 py-1.5 rounded transition-all flex items-center gap-1.5">
+                                    🖨️ Imprimir Pedido
+                                </button>
+                                <button onclick="imprimirOrdemFornecimento(${req.id})" class="border border-blue-200 hover:bg-blue-50 text-blue-700 font-semibold text-xs px-3 py-1.5 rounded transition-all flex items-center gap-1.5">
+                                    📜 Imprimir Ordem de Fornecimento
+                                </button>
+                            </div>
+                        </div>
+                        <div class="p-4">
+                            <div class="mb-4 bg-amber-50 border border-amber-200 rounded-lg p-3 text-sm">
+                                <span class="block text-xs font-bold text-amber-800 uppercase mb-1">Justificativa de Uso</span>
+                                <p class="text-gray-700 italic">"${req.justification || 'Não informada'}"</p>
+                            </div>
+
+                            <table class="w-full text-left border-collapse">
+                                <thead>
+                                    <tr class="text-xs text-gray-400 uppercase border-b border-gray-200 pb-2">
+                                        <th class="pb-2 font-medium">Material</th>
+                                        <th class="pb-2 text-center font-medium">Unidade</th>
+                                        <th class="pb-2 text-center font-medium">Pedida</th>
+                                        <th class="pb-2 text-right font-medium">Situação de Estoque</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    ${itemsHtml}
+                                </tbody>
+                            </table>
+                        </div>
+                        <div class="bg-gray-50 border-t border-gray-100 p-4 flex justify-end gap-3">
+                            <button onclick="recusarSolicitacao(${req.id})" class="bg-red-50 hover:bg-red-100 text-red-700 font-semibold text-sm px-4 py-2 rounded-lg transition-all">
+                                Recusar Solicitação
+                            </button>
+                            <button onclick="aprovarSolicitacao(${req.id})" class="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-sm px-5 py-2 rounded-lg shadow-sm transition-all">
+                                Liberar & Deduzir do Saldo
+                            </button>
+                        </div>
+                    </div>
+                `;
+            });
+            container.innerHTML = html;
+        }
+
+        function aprovarSolicitacao(id) {
+            const reqIndex = state.requests.findIndex(r => r.id === id);
+            if (reqIndex === -1) return;
+
+            const req = state.requests[reqIndex];
+            
+            let erroEstoque = [];
+            req.items.forEach(item => {
+                const originalMaterial = state.materials.find(m => m.id === item.materialId);
+                if (!originalMaterial || originalMaterial.balance < item.qtyRequested) {
+                    erroEstoque.push(item.name);
+                }
+            });
+
+            if (erroEstoque.length > 0) {
+                if (!confirm(`Atenção: Os seguintes itens não possuem saldo suficiente no estoque:\n- ${erroEstoque.join('\n- ')}\n\nDeseja forçar a liberação mesmo assim (o estoque poderá ficar negativo)?`)) {
+                    return;
+                }
+            }
+
+            req.items.forEach(item => {
+                const originalMaterial = state.materials.find(m => m.id === item.materialId);
+                if (originalMaterial) {
+                    originalMaterial.balance -= item.qtyRequested;
+                }
+            });
+
+            req.status = 'approved';
+            req.dateProcessed = new Date().toLocaleString('pt-BR');
+            req.approvedBy = state.currentUser ? state.currentUser.name : 'Administrador';
+            
+            saveState();
+            renderPendentes();
+            renderTabsMenu();
+            alert("Solicitação autorizada e baixada do estoque com sucesso!");
+        }
+
+        function recusarSolicitacao(id) {
+            if (confirm("Deseja realmente recusar esta solicitação?")) {
+                const reqIndex = state.requests.findIndex(r => r.id === id);
+                if (reqIndex === -1) return;
+
+                state.requests[reqIndex].status = 'rejected';
+                state.requests[reqIndex].dateProcessed = new Date().toLocaleString('pt-BR');
+                state.requests[reqIndex].approvedBy = state.currentUser ? state.currentUser.name : 'Administrador';
+                
+                saveState();
+                renderPendentes();
+                renderTabsMenu();
+                alert("Solicitação recusada.");
+            }
+        }
+
+        // ================= FUNÇÕES: ABA HISTÓRICO (ADMIN) =================
+
+        function renderHistorico() {
+            const tbody = document.getElementById('historico-tbody');
+            const processados = state.requests.filter(r => r.status !== 'pending' && r.ativo !== false);
+
+            if (processados.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="6" class="py-8 text-center text-gray-400">Nenhuma solicitação processada no histórico.</td></tr>`;
+                return;
+            }
+
+            let html = '';
+            processados.forEach(req => {
+                let statusBadge = '';
+                if (req.status === 'approved') {
+                    statusBadge = '<span class="bg-emerald-100 text-emerald-800 text-xs px-2.5 py-1 rounded-full font-semibold">Aprovado</span>';
+                } else {
+                    statusBadge = '<span class="bg-red-100 text-red-800 text-xs px-2.5 py-1 rounded-full font-semibold">Recusado</span>';
+                }
+
+                let itensResumo = req.items.map(i => `<span class="font-mono text-[11px] text-gray-500">[${i.code || 'S/C'}]</span> ${i.qtyRequested}x ${i.name}`).join('<br>');
+                
+                let detalheJustificativa = `
+                    <div class="mt-2 text-xs text-gray-500 border-t border-gray-100 pt-1 leading-relaxed">
+                        <strong class="text-gray-700">Justif:</strong> "${req.justification || 'Não detalhado'}"
+                    </div>
+                `;
+
+                html += `
+                    <tr class="hover:bg-gray-50 text-xs sm:text-sm">
+                        <td class="py-3 px-4 text-gray-500 text-xs">${req.dateProcessed || req.date}</td>
+                        <td class="py-3 px-4 font-bold text-gray-900">${req.userName}</td>
+                        <td class="py-3 px-4 text-gray-600">${req.userSector}</td>
+                        <td class="py-3 px-4 text-gray-700 leading-snug">
+                            <div>${itensResumo}</div>
+                            ${detalheJustificativa}
+                        </td>
+                        <td class="py-3 px-4 text-center">${statusBadge}</td>
+                        <td class="py-3 px-4 text-center space-x-1 whitespace-nowrap">
+                            <button onclick="imprimirPedido(${req.id})" class="text-blue-600 hover:underline text-xs">Ver Pedido</button>
+                            ${req.status === 'approved' ? `| <button onclick="imprimirOrdemFornecimento(${req.id})" class="text-emerald-700 hover:underline text-xs font-semibold">Ordem Fornec.</button>` : ''}
+                            | <button onclick="excluirSolicitacaoLogica(${req.id})" class="text-red-500 hover:underline text-xs">Excluir</button>
+                        </td>
+                    </tr>
+                `;
+            });
+            tbody.innerHTML = html;
+        }
+
+        function limparHistorico() {
+            if (confirm("Atenção! Isso ocultará todo o histórico de solicitações processadas. Confirmar?")) {
+                state.requests.forEach(r => {
+                    if (r.status !== 'pending') {
+                        r.ativo = false;
+                    }
+                });
+                saveState();
+                renderHistorico();
+                renderTabsMenu();
+            }
+        }
+
+        // ================= SISTEMA DE IMPRESSÕES E RELATÓRIOS =================
+
+        function runPrint(html) {
+            const printArea = document.getElementById('print-area');
+            printArea.innerHTML = html;
+            window.print();
+            printArea.innerHTML = '';
+        }
+
+        function imprimirEstoqueCompleto() {
+            let trs = '';
+            state.materials.forEach(mat => {
+                trs += `
+                    <tr style="border-bottom: 1px solid #ddd;">
+                        <td style="padding: 8px 12px; text-align: left; font-family: monospace; font-size: 12px; font-weight: bold; color: #1e3a8a;">${mat.code || 'S/C'}</td>
+                        <td style="padding: 8px 12px; text-align: left;">${mat.name}</td>
+                        <td style="padding: 8px 12px; text-align: center;">${mat.unit}</td>
+                        <td style="padding: 8px 12px; text-align: center; font-weight: bold;">${mat.balance}</td>
+                    </tr>
+                `;
+            });
+
+            const currentAdminName = state.currentUser ? state.currentUser.name : 'Administrador do Almoxarifado';
+
+            const template = `
+                <div style="font-family: Arial, sans-serif; padding: 30px;">
+                    <div style="text-align: center; margin-bottom: 30px;">
+                        <h1 style="margin: 0 0 5px 0; font-size: 24px; text-transform: uppercase; color: #1e3a8a;">Relatório de Estoque e Saldos</h1>
+                        <p style="margin: 0; font-size: 12px; color: #555;">Gerado em: ${new Date().toLocaleString('pt-BR')}</p>
+                    </div>
+                    <table style="width: 100%; border-collapse: collapse; margin-top: 10px;">
+                        <thead>
+                            <tr style="background-color: #1e3a8a; color: #ffffff; border-bottom: 2px solid #102a43;">
+                                <th style="padding: 10px 12px; text-align: left; width: 120px; color: #ffffff;">Código</th>
+                                <th style="padding: 10px 12px; text-align: left; color: #ffffff;">Descrição do Material</th>
+                                <th style="padding: 10px 12px; text-align: center; width: 150px; color: #ffffff;">Unidade</th>
+                                <th style="padding: 10px 12px; text-align: center; width: 150px; color: #ffffff;">Saldo Físico</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${trs}
+                        </tbody>
+                    </table>
+
+                    <div style="margin-top: 80px; display: flex; justify-content: center; font-size: 13px;">
+                        <div style="text-align: center; border-top: 1px solid #000; width: 320px; padding-top: 8px;">
+                            <p style="margin: 0;"><strong>${currentAdminName}</strong></p>
+                            <p style="margin: 4px 0 0 0; font-size: 11px; color: #555;">Assinatura do Administrador</p>
+                        </div>
+                    </div>
+                </div>
+            `;
+            runPrint(template);
+        }
+
+        function imprimirPedido(id) {
+            const req = state.requests.find(r => r.id === id);
+            if (!req) return;
+
+            let trs = '';
+            req.items.forEach(item => {
+                trs += `
+                    <tr style="border-bottom: 1px solid #eee;">
+                        <td style="padding: 8px 12px; text-align: left;">
+                            <span style="font-family: monospace; font-size: 11px; background: #f1f5f9; padding: 2px 6px; border-radius: 4px; margin-right: 8px; color: #475569; font-weight: bold;">${item.code || 'S/C'}</span>
+                            ${item.name}
+                        </td>
+                        <td style="padding: 8px 12px; text-align: center;">${item.unit}</td>
+                        <td style="padding: 8px 12px; text-align: center; font-weight: bold;">${item.qtyRequested}</td>
+                    </tr>
+                `;
+            });
+
+            const adminName = req.approvedBy || (state.currentUser && state.currentUser.role === 'admin' ? state.currentUser.name : 'Responsável do Almoxarifado');
+
+            const template = `
+                <div style="font-family: Arial, sans-serif; padding: 40px; border: 1px solid #ccc; max-width: 800px; margin: auto;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #2563eb; padding-bottom: 15px; margin-bottom: 20px;">
+                        <div>
+                            <h1 style="margin: 0; font-size: 22px; color: #2563eb;">PEDIDO DE SOLICITAÇÃO</h1>
+                            <p style="margin: 3px 0 0 0; font-size: 12px; color: #666;">Controle Interno de Despensa</p>
+                        </div>
+                        <div style="text-align: right;">
+                            <span style="background-color: #e2e8f0; padding: 5px 10px; border-radius: 4px; font-weight: bold; font-size: 12px;">ID: #${req.id.toString().slice(-6)}</span>
+                        </div>
+                    </div>
+                    
+                    <div style="display: flex; justify-content: space-between; background: #f8fafc; padding: 15px; border-radius: 6px; margin-bottom: 20px; font-size: 14px;">
+                        <div>
+                            <strong>Solicitante:</strong> ${req.userName}<br>
+                            <strong>Setor:</strong> ${req.userSector}
+                        </div>
+                        <div style="text-align: right;">
+                            <strong>Data:</strong> ${req.date}<br>
+                            <strong>Status:</strong> ${req.status === 'pending' ? 'AGUARDANDO LIBERAÇÃO' : req.status.toUpperCase()}
+                        </div>
+                    </div>
+
+                    <div style="background-color: #fffbeb; border: 1px solid #fef3c7; padding: 12px 15px; border-radius: 6px; margin-bottom: 25px; font-size: 13px;">
+                        <strong style="color: #b45309; display: block; margin-bottom: 4px; text-transform: uppercase; font-size: 11px;">Finalidade / Justificativa informada:</strong>
+                        <span style="font-style: italic; color: #374151;">"${req.justification || 'Não informada'}"</span>
+                    </div>
+
+                    <table style="width: 100%; border-collapse: collapse;">
+                        <thead>
+                            <tr style="background-color: #2563eb; color: #ffffff;">
+                                <th style="padding: 10px 12px; text-align: left; font-size: 13px; color: #ffffff;">Material Solicitado</th>
+                                <th style="padding: 10px 12px; text-align: center; width: 120px; font-size: 13px; color: #ffffff;">Unidade</th>
+                                <th style="padding: 10px 12px; text-align: center; width: 120px; font-size: 13px; color: #ffffff;">Qtd. Desejada</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${trs}
+                        </tbody>
+                    </table>
+
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 40px; margin-top: 80px; font-size: 13px;">
+                        <div style="text-align: center; border-top: 1px solid #000; padding-top: 8px;">
+                            <p style="margin: 0;"><strong>${req.userName}</strong></p>
+                            <p style="margin: 4px 0 0 0; font-size: 11px; color: #555;">Assinatura do Solicitante</p>
+                        </div>
+                        <div style="text-align: center; border-top: 1px solid #000; padding-top: 8px;">
+                            <p style="margin: 0;"><strong>${adminName}</strong></p>
+                            <p style="margin: 4px 0 0 0; font-size: 11px; color: #555;">Assinatura do Administrador</p>
+                        </div>
+                    </div>
+
+                    <div style="margin-top: 50px; text-align: center; font-size: 12px; color: #777;">
+                        <p>Documento gerado eletronicamente para controle e conferência administrativa.</p>
+                    </div>
+                </div>
+            `;
+            runPrint(template);
+        }
+
+        function imprimirOrdemFornecimento(id) {
+            const req = state.requests.find(r => r.id === id);
+            if (!req) return;
+
+            let trs = '';
+            req.items.forEach(item => {
+                trs += `
+                    <tr style="border-bottom: 1px solid #ddd;">
+                        <td style="padding: 8px 12px; text-align: left;">
+                            <span style="font-family: monospace; font-size: 11px; background: #f1f5f9; padding: 2px 6px; border-radius: 4px; margin-right: 8px; color: #475569; font-weight: bold;">${item.code || 'S/C'}</span>
+                            ${item.name}
+                        </td>
+                        <td style="padding: 8px 12px; text-align: center;">${item.unit}</td>
+                        <td style="padding: 8px 12px; text-align: center; font-weight: bold;">${item.qtyRequested}</td>
+                        <td style="padding: 8px 12px; text-align: center; border-left: 1px solid #ddd; width: 100px;">[ &nbsp; ] OK</td>
+                    </tr>
+                `;
+            });
+
+            const adminName = req.approvedBy || (state.currentUser && state.currentUser.role === 'admin' ? state.currentUser.name : 'Responsável do Almoxarifado');
+
+            const template = `
+                <div style="font-family: Arial, sans-serif; padding: 40px; border: 2px solid #1e293b; max-width: 800px; margin: auto;">
+                    <div style="text-align: center; border-bottom: 2px dashed #1e293b; padding-bottom: 15px; margin-bottom: 20px;">
+                        <h1 style="margin: 0; font-size: 24px; letter-spacing: 1px; font-weight: 800; color: #1e293b;">ORDEM DE FORNECIMENTO</h1>
+                        <p style="margin: 5px 0 0 0; font-size: 13px; font-weight: bold; color: #475569;">GUIA DE LIBERAÇÃO E SAÍDA DE MATERIAIS</p>
+                    </div>
+
+                    <div style="display: flex; justify-content: space-between; font-size: 14px; margin-bottom: 20px;">
+                        <div>
+                            <p style="margin: 4px 0;"><strong>Destinatário / Requerente:</strong> ${req.userName}</p>
+                            <p style="margin: 4px 0;"><strong>Destino / Setor:</strong> ${req.userSector}</p>
+                        </div>
+                        <div style="text-align: right;">
+                            <p style="margin: 4px 0;"><strong>No. Controle:</strong> OF-${req.id.toString().slice(-6)}</p>
+                            <p style="margin: 4px 0;"><strong>Data de Processamento:</strong> ${req.dateProcessed || req.date}</p>
+                        </div>
+                    </div>
+
+                    <div style="font-size: 13px; background-color: #f1f5f9; padding: 12px; border-radius: 6px; margin-bottom: 20px; border-left: 4px solid #475569;">
+                        <strong>Justificativa registrada:</strong> "${req.justification || 'Não detalhada'}"
+                    </div>
+
+                    <table style="width: 100%; border-collapse: collapse; margin-bottom: 40px;">
+                        <thead>
+                            <tr style="background-color: #1e293b; color: #ffffff;">
+                                <th style="padding: 10px 12px; text-align: left; font-size: 12px; color: #ffffff;">Especificação do Item</th>
+                                <th style="padding: 10px 12px; text-align: center; width: 120px; font-size: 12px; color: #ffffff;">Unidade</th>
+                                <th style="padding: 10px 12px; text-align: center; width: 100px; font-size: 12px; color: #ffffff;">Qtd. Autorizada</th>
+                                <th style="padding: 10px 12px; text-align: center; width: 100px; font-size: 12px; border-left: 1px solid #ddd; color: #ffffff;">Conferência</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${trs}
+                        </tbody>
+                    </table>
+
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 40px; margin-top: 80px; font-size: 13px;">
+                        <div style="text-align: center; border-top: 1px solid #000; padding-top: 8px;">
+                            <p style="margin: 0;"><strong>${adminName}</strong></p>
+                            <p style="margin: 4px 0 0 0; font-size: 11px; color: #555;">Autorizador da Baixa (Almoxarife)</p>
+                        </div>
+                        <div style="text-align: center; border-top: 1px solid #000; padding-top: 8px;">
+                            <p style="margin: 0;"><strong>${req.userName}</strong></p>
+                            <p style="margin: 4px 0 0 0; font-size: 11px; color: #555;">Recebedor (Solicitante)</p>
+                        </div>
+                    </div>
+                </div>
+            `;
+            runPrint(template);
+        }
+
+        // --- CONTROLE DO MODAL DE SENHA ---
+        function abrirModalSenha() {
+            const modal = document.getElementById('modal-senha');
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+        }
+
+        function fecharModalSenha() {
+            const modal = document.getElementById('modal-senha');
+            modal.classList.add('hidden');
+            modal.classList.remove('flex');
+            document.getElementById('nova-senha-input').value = '';
+            document.getElementById('confirma-senha-input').value = '';
+        }
+
+        function salvarNovaSenha(e) {
+            e.preventDefault();
+            const novaSenha = document.getElementById('nova-senha-input').value;
+            const confirmaSenha = document.getElementById('confirma-senha-input').value;
+
+            if (novaSenha.length < 4) {
+                alert("A senha deve ter pelo menos 4 caracteres.");
+                return;
+            }
+
+            if (novaSenha !== confirmaSenha) {
+                alert("As senhas digitadas não são iguais!");
+                return;
+            }
+
+            // Atualiza a senha na sessão ativa
+            state.currentUser.password = novaSenha;
+
+            // Atualiza a senha na lista de usuários do LocalStorage
+            const usuarioOriginal = state.users.find(u => u.id === state.currentUser.id);
+            if (usuarioOriginal) {
+                usuarioOriginal.password = novaSenha;
+            }
+
+            saveState();
+            fecharModalSenha();
+            
+            // Oculta o banner de aviso
+            document.getElementById('alerta-senha-padrao').classList.add('hidden');
+            
+            alert("Sua senha foi atualizada com sucesso!");
+        }
+
+        // Soft Delete Individual
+        function excluirSolicitacaoLogica(id) {
+            if (confirm("Tem certeza que deseja ocultar esta solicitação do histórico?")) {
+                const req = state.requests.find(r => r.id === id);
+                if (req) {
+                    req.ativo = false; 
+                    saveState();
+                    renderHistorico();
+                }
+            }
+        }
+
+        // --- GERAÇÃO DE CÓDIGO EXCLUSIVO PARA O MATERIAL ---
+        function gerarCodigoMaterial() {
+            let codigo;
+            let existe = true;
+            while (existe) {
+                const numero = Math.floor(1000 + Math.random() * 9000);
+                codigo = `MAT-${numero}`;
+                existe = state.materials.some(m => m.code === codigo);
+            }
+            return codigo;
+        }
+
+        // Inicialização do Sistema ao carregar
+        window.onload = function() {
+            setSession();
+        };
+    </script>
+</body>
+</html>
