@@ -29,6 +29,11 @@
                 display: none !important;
             }
         }
+
+        /* Oculta colunas de saldo para não-administradores de forma robusta */
+        body.not-admin .col-saldo {
+            display: none !important;
+        }
     </style>
 </head>
 <body class="bg-gray-50 font-sans text-gray-800 min-h-screen flex flex-col">
@@ -114,40 +119,40 @@
         <section id="pane-solicitacao" class="tab-pane hidden">
             <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
                 <!-- Lado Esquerdo: Formulário de Pedido com Justificativa -->
-                <div class="lg:col-span-4 bg-white p-5 rounded-xl border border-gray-200 shadow-sm flex flex-col justify-between">
-                    <div class="space-y-4">
-                        <h2 class="text-lg font-bold text-gray-900 flex items-center gap-2">
-                            <span>📝</span> Nova Solicitação
-                        </h2>
-                        
-                        <!-- Identificação Automática do Solicitante -->
-                        <div class="bg-blue-50 border border-blue-200 rounded-lg p-3.5">
-                            <span class="block text-xs font-semibold text-blue-800 uppercase mb-1">Solicitante Identificado</span>
-                            <p id="solicitante-nome" class="text-sm font-bold text-gray-950">-</p>
-                            <p id="solicitante-setor" class="text-xs text-gray-600 mt-0.5">-</p>
-                        </div>
-
-                        <!-- Campo de Justificativa -->
-                        <div>
-                            <label class="block text-xs font-bold text-gray-700 uppercase mb-1">Justificativa do Pedido</label>
-                            <textarea id="solicitacao-justificativa" placeholder="Descreva aqui o motivo ou para onde serão destinados esses materiais..." rows="3" required class="w-full bg-gray-50 border border-gray-300 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-blue-500 outline-none transition-all resize-none"></textarea>
-                        </div>
-
-                        <div>
-                            <h3 class="text-xs font-semibold text-gray-600 uppercase mb-2">Itens Selecionados</h3>
-                            <div id="carrinho-vazio" class="text-sm text-gray-400 py-6 text-center border-2 border-dashed border-gray-200 rounded-lg">
-                                Nenhum material adicionado ainda.<br>Clique nos itens da lista ao lado.
-                            </div>
-                            <ul id="carrinho-lista" class="space-y-2 max-h-48 overflow-y-auto pr-1">
-                                <!-- Itens adicionados aparecem aqui -->
-                            </ul>
-                        </div>
+                <div class="lg:col-span-4 bg-white p-5 rounded-xl border border-gray-200 shadow-sm flex flex-col gap-4 h-fit">
+                    <h2 class="text-lg font-bold text-gray-900 flex items-center gap-2">
+                        <span>📝</span> Nova Solicitação
+                    </h2>
+                    
+                    <!-- Identificação Automática do Solicitante -->
+                    <div class="bg-blue-50 border border-blue-200 rounded-lg p-3.5">
+                        <span class="block text-xs font-semibold text-blue-800 uppercase mb-1">Solicitante Identificado</span>
+                        <p id="solicitante-nome" class="text-sm font-bold text-gray-950">-</p>
+                        <p id="solicitante-setor" class="text-xs text-gray-600 mt-0.5">-</p>
                     </div>
 
-                    <div class="pt-4 border-t border-gray-100 mt-4">
+                    <!-- Campo de Justificativa -->
+                    <div>
+                        <label class="block text-xs font-bold text-gray-700 uppercase mb-1">Justificativa do Pedido</label>
+                        <textarea id="solicitacao-justificativa" placeholder="Descreva aqui o motivo ou para onde serão destinados esses materiais..." rows="3" required class="w-full bg-gray-50 border border-gray-300 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-blue-500 outline-none transition-all resize-none"></textarea>
+                    </div>
+
+                    <!-- Botão enviado para o topo da barra lateral -->
+                    <div class="border-b border-gray-100 pb-2">
                         <button onclick="enviarSolicitacao()" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-semibold py-3 px-4 rounded-lg shadow-md transition-all flex justify-center items-center gap-2">
                             <span>🚀</span> Enviar Solicitação
                         </button>
+                    </div>
+
+                    <!-- Lista de itens selecionados -->
+                    <div>
+                        <h3 class="text-xs font-semibold text-gray-600 uppercase mb-2">Itens Selecionados</h3>
+                        <div id="carrinho-vazio" class="text-xs text-gray-400 py-6 text-center border-2 border-dashed border-gray-200 rounded-lg">
+                            Nenhum material adicionado ainda.<br>Clique nos itens da lista ao lado.
+                        </div>
+                        <ul id="carrinho-lista" class="space-y-2 max-h-64 overflow-y-auto pr-1">
+                            <!-- Itens adicionados aparecem aqui -->
+                        </ul>
                     </div>
                 </div>
 
@@ -162,9 +167,9 @@
                     </div>
 
                     <div class="overflow-x-auto">
-                        <table class="w-full text-left border-collapse text-sm">
+                        <table class="w-full text-left border-collapse text-xs">
                             <thead>
-                                <tr class="bg-gray-50 text-gray-600 uppercase text-xs font-semibold border-b border-gray-200">
+                                <tr class="bg-gray-50 text-gray-600 uppercase text-[11px] font-semibold border-b border-gray-200">
                                     <th class="py-3 px-4">Material</th>
                                     <th class="py-3 px-4 text-center">Unidade</th>
                                     <th class="py-3 px-4 text-center col-saldo">Saldo Disponível</th>
@@ -428,6 +433,7 @@
                 if (state.currentUser) {
                     const atualizado = state.users.find(u => u.username === state.currentUser.username);
                     if (atualizado) {
+                        state.currentUser = updated;
                         state.currentUser = atualizado;
                         saveState();
                         document.getElementById('header-user-info').innerText = `${state.currentUser.name} [${state.currentUser.sector}]`;
@@ -534,6 +540,7 @@
             
             const loginScreen = document.getElementById('login-screen');
             loginScreen.classList.remove('hidden');
+            document.body.classList.remove('not-admin');
         }
 
         function setSession() {
@@ -547,6 +554,13 @@
 
             loginScreen.classList.add('hidden');
             document.getElementById('header-user-info').innerText = `${state.currentUser.name} [${state.currentUser.sector}]`;
+
+            // Alterna classe no body baseada no perfil para gerenciar o saldo pelo CSS
+            if (state.currentUser.role === 'admin') {
+                document.body.classList.remove('not-admin');
+            } else {
+                document.body.classList.add('not-admin');
+            }
 
             if (state.currentUser.password === '123') {
                 document.getElementById('alerta-senha-padrao').classList.remove('hidden');
@@ -638,11 +652,6 @@
             const query = document.getElementById('busca-material').value.toLowerCase();
             const tbody = document.getElementById('catalogo-tbody');
             
-            const colsSaldo = document.querySelectorAll('.col-saldo');
-            colsSaldo.forEach(el => {
-                el.style.display = state.currentUser.role === 'admin' ? '' : 'none';
-            });
-
             const filtered = state.materials.filter(m => m.name.toLowerCase().includes(query));
             
             if (filtered.length === 0) {
@@ -654,18 +663,19 @@
             filtered.forEach(m => {
                 const inCart = state.cart.find(item => item.materialId === m.id);
                 const buttonHtml = inCart 
-                    ? `<span class="bg-blue-100 text-blue-800 text-xs font-semibold px-2.5 py-1 rounded-full">Na lista</span>`
-                    : `<button onclick="addToCart('${m.id}')" class="bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold py-1 px-3 rounded shadow transition-all">Selecionar</button>`;
+                    ? `<span class="bg-blue-100 text-blue-800 text-[11px] font-semibold px-2 py-0.5 rounded-full">Na lista</span>`
+                    : `<button onclick="addToCart('${m.id}')" class="bg-blue-600 hover:bg-blue-700 text-white text-[11px] font-semibold py-1 px-2.5 rounded shadow transition-all">Selecionar</button>`;
 
+                // Reduzido para text-xs e py-2 para visualização compacta
                 html += `
-                    <tr class="hover:bg-gray-50 transition-colors">
-                        <td class="py-3 px-4 font-medium text-gray-950">
-                            <span class="text-[11px] font-mono bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded mr-2 font-semibold">${m.code || 'S/C'}</span>
+                    <tr class="hover:bg-gray-50 transition-colors text-xs">
+                        <td class="py-2 px-4 font-medium text-gray-950">
+                            <span class="text-[10px] font-mono bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded mr-2 font-semibold">${m.code || 'S/C'}</span>
                             ${m.name}
                         </td>
-                        <td class="py-3 px-4 text-center text-gray-500">${m.unit}</td>
-                        <td class="py-3 px-4 text-center font-bold text-gray-700 col-saldo" style="display: ${state.currentUser.role === 'admin' ? '' : 'none'}">${m.balance}</td>
-                        <td class="py-3 px-4 text-center">${buttonHtml}</td>
+                        <td class="py-2 px-4 text-center text-gray-500">${m.unit}</td>
+                        <td class="py-2 px-4 text-center font-bold text-gray-700 col-saldo">${m.balance}</td>
+                        <td class="py-2 px-4 text-center">${buttonHtml}</td>
                     </tr>
                 `;
             });
@@ -707,17 +717,18 @@
                 const material = state.materials.find(m => m.id === item.materialId);
                 if (!material) return;
 
+                // Carrinho lateral reduzido para text-xs
                 html += `
-                    <li class="flex items-center justify-between bg-gray-50 p-3 rounded-lg border border-gray-200 gap-2">
+                    <li class="flex items-center justify-between bg-gray-50 p-2 rounded-lg border border-gray-200 gap-2 text-xs">
                         <div class="flex-grow min-w-0">
-                            <p class="text-sm font-semibold text-gray-800 truncate">
-                                <span class="font-mono text-xs text-gray-500 mr-1">[${material.code || 'S/C'}]</span>
+                            <p class="font-semibold text-gray-800 truncate">
+                                <span class="font-mono text-[10px] text-gray-500 mr-1">[${material.code || 'S/C'}]</span>
                                 ${material.name}
                             </p>
-                            <span class="text-xs text-gray-500">${material.unit}</span>
+                            <span class="text-[11px] text-gray-500">${material.unit}</span>
                         </div>
                         <div class="flex items-center gap-1.5 flex-shrink-0">
-                            <input type="number" min="1" value="${item.qty}" onchange="updateCartQty('${material.id}', this.value)" class="w-16 text-center bg-white border border-gray-300 rounded p-1 text-sm font-medium focus:ring-1 focus:ring-blue-500 outline-none">
+                            <input type="number" min="1" value="${item.qty}" onchange="updateCartQty('${material.id}', this.value)" class="w-14 text-center bg-white border border-gray-300 rounded p-1 text-xs font-medium focus:ring-1 focus:ring-blue-500 outline-none">
                             <button onclick="removeFromCart('${material.id}')" class="text-red-500 hover:text-red-700 hover:bg-red-50 p-1 rounded transition-all" title="Remover">
                                 🗑️
                             </button>
@@ -983,7 +994,6 @@
             }
         }
 
-        // --- EXCLUIR MATERIAL (ADICIONADA) ---
         function excluirMaterial(id) {
             if (confirm("Tem certeza que deseja excluir permanentemente este material do estoque?")) {
                 db.collection("materials").doc(id).delete()
@@ -1023,7 +1033,7 @@
                     itemsHtml += `
                         <tr class="border-b border-gray-100 text-sm">
                             <td class="py-2.5 px-1 text-gray-800">
-                                <span class="font-mono text-xs text-slate-500 mr-2">[${item.code || 'S/C'}]</span>
+                                <span class="font-mono text-xs text-slate-500 mr-2">[${item.code || 'S/C'}</span>
                                 ${item.name}
                             </td>
                             <td class="py-2.5 px-1 text-center text-gray-500">${item.unit}</td>
@@ -1422,6 +1432,7 @@
             document.getElementById('confirma-senha-input').value = '';
         }
 
+        // Salvar a nova senha no banco
         function salvarNovaSenha(e) {
             e.preventDefault();
             const novaSenha = document.getElementById('nova-senha-input').value;
