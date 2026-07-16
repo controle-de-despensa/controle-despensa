@@ -462,7 +462,7 @@
                 if (state.currentUser) {
                     const atualizado = state.users.find(u => u.username === state.currentUser.username);
                     if (atualizado) {
-                        state.currentUser = atualizado; 
+                        state.currentUser = updated; 
                         saveState();
                         document.getElementById('header-user-info').innerText = `${state.currentUser.name} [${state.currentUser.sector}]`;
                     }
@@ -521,9 +521,9 @@
         function criarMateriaisPadrao() {
             const defaults = [
                 { code: 'MAT-1502', name: 'Arroz Agulhinha Tipo 1', unit: 'Saco 5kg', balance: 15 },
-                { code: 'MAT-3829', name: 'Azeite de Oliva Extra Virgem', unit: 'Garrafa 500ml', balance: 8 },
+                { code: 'MAT-3829', name: 'Azeite de Oliva Extra Virgem', unit: 'Garrafa 500ml', balance: 3 },
                 { code: 'MAT-8291', name: 'Açúcar Refinado', unit: 'Pct 1kg', balance: 30 },
-                { code: 'MAT-4721', name: 'Café Torrado e Moído', unit: 'Vácuo 500g', balance: 12 },
+                { code: 'MAT-4721', name: 'Café Torrado e Moído', unit: 'Vácuo 500g', balance: 2 },
                 { code: 'MAT-9031', name: 'Detergente Neutro Concentrado', unit: 'Frasco 500ml', balance: 25 }
             ];
             defaults.forEach(m => db.collection("materials").add(m));
@@ -700,10 +700,16 @@
                     ? `<span class="bg-blue-100 text-blue-800 text-[11px] font-semibold px-2 py-0.5 rounded-full">Na lista</span>`
                     : `<button onclick="addToCart('${m.id}')" class="bg-blue-600 hover:bg-blue-700 text-white text-[11px] font-semibold py-1 px-2.5 rounded shadow transition-all">Selecionar</button>`;
 
+                // Alerta visual de estoque crítico (< 5 unidades) no catálogo
+                const isLowStock = m.balance < 5;
+                const codeClass = isLowStock 
+                    ? "bg-red-100 text-red-700 border border-red-200 font-extrabold" 
+                    : "bg-slate-100 text-slate-600 font-semibold";
+
                 html += `
                     <tr class="hover:bg-gray-50 transition-colors text-xs">
                         <td class="py-2 px-4 font-medium text-gray-950">
-                            <span class="text-[10px] font-mono bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded mr-2 font-semibold">${m.code || 'S/C'}</span>
+                            <span class="text-[10px] font-mono ${codeClass} px-1.5 py-0.5 rounded mr-2">${m.code || 'S/C'}</span>
                             ${m.name}
                         </td>
                         <td class="py-2 px-4 text-center text-gray-500">${m.unit}</td>
@@ -751,11 +757,15 @@
                 const material = state.materials.find(m => m.id === item.materialId);
                 if (!material) return;
 
+                // Alerta visual de estoque crítico no carrinho lateral (< 5 unidades)
+                const isLowStock = material.balance < 5;
+                const codeClass = isLowStock ? "text-red-600 font-bold" : "text-gray-500";
+
                 html += `
                     <li class="flex items-center justify-between bg-gray-50 p-2 rounded-lg border border-gray-200 gap-2 text-xs">
                         <div class="flex-grow min-w-0">
                             <p class="font-semibold text-gray-800 truncate">
-                                <span class="font-mono text-[10px] text-gray-500 mr-1">[${material.code || 'S/C'}]</span>
+                                <span class="font-mono text-[10px] ${codeClass} mr-1">[${material.code || 'S/C'}]</span>
                                 ${material.name}
                             </p>
                             <span class="text-[11px] text-gray-500">${material.unit}</span>
@@ -995,9 +1005,15 @@
 
             let html = '';
             state.materials.forEach(mat => {
+                // Alerta visual de estoque crítico na gestão de saldos (< 5 unidades)
+                const isLowStock = mat.balance < 5;
+                const codeClass = isLowStock 
+                    ? "text-red-600 bg-red-50 border border-red-100 px-1.5 py-0.5 rounded font-extrabold" 
+                    : "text-blue-900";
+
                 html += `
                     <tr class="hover:bg-gray-50">
-                        <td class="py-3 px-4 font-mono text-xs font-bold text-blue-900">${mat.code || 'S/C'}</td>
+                        <td class="py-3 px-4 font-mono text-xs font-bold ${codeClass}">${mat.code || 'S/C'}</td>
                         <td class="py-3 px-4 font-medium text-gray-900">${mat.name}</td>
                         <td class="py-3 px-4 text-center text-gray-600">${mat.unit}</td>
                         <td class="py-3 px-4 text-center font-bold text-blue-600">${mat.balance}</td>
@@ -1141,7 +1157,7 @@
                 }
             });
 
-            // Atualiza status da solicitação
+            //  Atualiza status da solicitação
             db.collection("requests").doc(id).update({
                 status: 'approved',
                 dateProcessed: new Date().toLocaleString('pt-BR'),
@@ -1256,10 +1272,16 @@
                         ? `<span class="text-red-600 font-bold text-[11px] bg-red-50 px-2 py-1 rounded">⚠️ Estoque Insuficiente (Saldo: ${saldoAtual})</span>`
                         : `<span class="text-emerald-700 text-[11px] bg-emerald-50 px-2 py-1 rounded">✓ Disponível (Saldo: ${saldoAtual})</span>`;
 
+                    // Alerta visual de estoque crítico no modal (< 5 unidades)
+                    const isLowStock = saldoAtual < 5;
+                    const codeClass = isLowStock 
+                        ? "text-red-650 bg-red-50 border border-red-200 px-1.5 py-0.5 rounded font-extrabold" 
+                        : "text-slate-500 font-semibold";
+
                     itemsHtml += `
                         <tr class="border-b border-gray-100 text-xs">
                             <td class="py-2.5 px-1 text-gray-800">
-                                <span class="font-mono text-[10px] text-slate-500 mr-2">[${item.code || 'S/C'}]</span>
+                                <span class="font-mono text-[10px] ${codeClass} mr-2">[${item.code || 'S/C'}]</span>
                                 ${item.name}
                             </td>
                             <td class="py-2.5 px-1 text-center text-gray-500">${item.unit}</td>
@@ -1275,10 +1297,19 @@
             } else {
                 // Se já estiver processado, exibe como texto informativo simples
                 req.items.forEach(item => {
+                    const originalMaterial = state.materials.find(m => m.id === item.materialId);
+                    const saldoAtual = originalMaterial ? originalMaterial.balance : 0;
+                    
+                    // Alerta visual de estoque crítico no histórico do modal (< 5 unidades)
+                    const isLowStock = saldoAtual < 5;
+                    const codeClass = isLowStock 
+                        ? "text-red-650 bg-red-50 border border-red-200 px-1.5 py-0.5 rounded font-extrabold" 
+                        : "text-slate-500 font-semibold";
+
                     itemsHtml += `
                         <tr class="border-b border-gray-100 text-xs">
                             <td class="py-2.5 px-1 text-gray-800">
-                                <span class="font-mono text-[10px] text-slate-500 mr-2">[${item.code || 'S/C'}]</span>
+                                <span class="font-mono text-[10px] ${codeClass} mr-2">[${item.code || 'S/C'}]</span>
                                 ${item.name}
                             </td>
                             <td class="py-2.5 px-1 text-center text-gray-500">${item.unit}</td>
@@ -1369,6 +1400,7 @@
             modal.classList.add('flex');
         }
 
+        // Função para fechar o modal
         function fecharModalPedido() {
             const modal = document.getElementById('modal-ver-pedido');
             modal.classList.add('hidden');
@@ -1386,7 +1418,7 @@
             fecharModalPedido();
         }
 
-        // ================= SISTEMA DE IMPRESSÕES E RELATÓRIOS (CORRIGIDO) =================
+        // ================= SISTEMA DE IMPRESSÕES E RELATÓRIOS =================
 
         function runPrint(html) {
             const printArea = document.getElementById('print-area');
