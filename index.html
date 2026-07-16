@@ -14,6 +14,10 @@
     <style>
         /* Estilos específicos para impressão */
         @media print {
+            body {
+                background-color: #ffffff !important;
+                color: #000000 !important;
+            }
             body > *:not(#print-area) {
                 display: none !important;
             }
@@ -23,7 +27,11 @@
                 left: 0;
                 top: 0;
                 width: 100%;
-                color: #000;
+            }
+            /* Força o navegador a renderizar as cores e estilos de fundo corretamente */
+            * {
+                -webkit-print-color-adjust: exact !important;
+                print-color-adjust: exact !important;
             }
             .no-print {
                 display: none !important;
@@ -340,9 +348,9 @@
                                 <th class="py-3 px-4">Data/Hora</th>
                                 <th class="py-3 px-4">Solicitante</th>
                                 <th class="py-3 px-4">Setor</th>
-                                <th class="py-3 px-4">Itens Pedidos / Justificativa</th>
+                                <th class="py-3 px-4">Justificativa</th>
                                 <th class="py-3 px-4 text-center">Status</th>
-                                <th class="py-3 px-4 text-center">Documentos</th>
+                                <th class="py-3 px-4 text-center">Ações</th>
                             </tr>
                         </thead>
                         <tbody id="historico-tbody" class="divide-y divide-gray-100">
@@ -359,6 +367,24 @@
     <footer class="bg-white border-t border-gray-200 py-4 text-center text-xs text-gray-500 mt-auto no-print">
         <p>Sistema de Gestão de Despensa • Firebase Firestore Realtime • 2026</p>
     </footer>
+
+    <!-- ================= MODAL VER DETALHES DO PEDIDO ================= -->
+    <div id="modal-ver-pedido" class="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm hidden items-center justify-center p-4">
+        <div class="bg-white rounded-2xl shadow-2xl border border-gray-100 p-6 w-full max-w-2xl flex flex-col max-h-[90vh]">
+            <div class="flex justify-between items-center mb-4 pb-2 border-b">
+                <h3 class="text-lg font-bold text-blue-900 flex items-center gap-2">
+                    <span>📋</span> Detalhes do Pedido
+                </h3>
+                <button onclick="fecharModalPedido()" class="text-gray-400 hover:text-gray-600 text-lg">✕</button>
+            </div>
+            <div id="modal-pedido-corpo" class="overflow-y-auto flex-grow pr-1 space-y-4">
+                <!-- Conteúdo dinâmico preenchido via JS -->
+            </div>
+            <div class="mt-4 pt-4 border-t flex flex-wrap justify-end gap-2" id="modal-pedido-botoes">
+                <!-- Botões dinâmicos de ações preenchidos via JS -->
+            </div>
+        </div>
+    </div>
 
     <!-- ================= MODAL DE ALTERAÇÃO DE SENHA ================= -->
     <div id="modal-senha" class="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm hidden items-center justify-center p-4">
@@ -414,6 +440,9 @@
             requests: [],
             cart: [] 
         };
+        
+        // Mantém controle do pedido aberto no modal para atualizar as quantidades em tempo real
+        let idPedidoAberto = null; 
 
         // Escutas em Tempo Real do Firebase (Sincronização Automática)
         function iniciarEscutasFirebase() {
@@ -433,8 +462,7 @@
                 if (state.currentUser) {
                     const atualizado = state.users.find(u => u.username === state.currentUser.username);
                     if (atualizado) {
-                        state.currentUser = updated;
-                        state.currentUser = atualizado;
+                        state.currentUser = atualizado; 
                         saveState();
                         document.getElementById('header-user-info').innerText = `${state.currentUser.name} [${state.currentUser.sector}]`;
                     }
@@ -472,6 +500,11 @@
                 renderPendentes();
                 renderHistorico();
                 renderTabsMenu();
+
+                // Se o modal estiver aberto, atualiza as informações dele em tempo real
+                if (idPedidoAberto) {
+                    abrirModalPedido(idPedidoAberto);
+                }
             });
         }
 
@@ -533,6 +566,7 @@
             }
         }
 
+        // Realizar logout
         function realizarLogout() {
             state.currentUser = null;
             state.cart = [];
@@ -666,7 +700,6 @@
                     ? `<span class="bg-blue-100 text-blue-800 text-[11px] font-semibold px-2 py-0.5 rounded-full">Na lista</span>`
                     : `<button onclick="addToCart('${m.id}')" class="bg-blue-600 hover:bg-blue-700 text-white text-[11px] font-semibold py-1 px-2.5 rounded shadow transition-all">Selecionar</button>`;
 
-                // Reduzido para text-xs e py-2 para visualização compacta
                 html += `
                     <tr class="hover:bg-gray-50 transition-colors text-xs">
                         <td class="py-2 px-4 font-medium text-gray-950">
@@ -682,6 +715,7 @@
             tbody.innerHTML = html;
         }
 
+        // Adiciona um item ao carrinho
         function addToCart(materialId) {
             state.cart.push({ materialId: materialId, qty: 1 });
             renderCarrinho();
@@ -717,7 +751,6 @@
                 const material = state.materials.find(m => m.id === item.materialId);
                 if (!material) return;
 
-                // Carrinho lateral reduzido para text-xs
                 html += `
                     <li class="flex items-center justify-between bg-gray-50 p-2 rounded-lg border border-gray-200 gap-2 text-xs">
                         <div class="flex-grow min-w-0">
@@ -1020,29 +1053,6 @@
 
             let html = '';
             pendentes.forEach(req => {
-                let itemsHtml = '';
-                req.items.forEach(item => {
-                    const originalMaterial = state.materials.find(m => m.id === item.materialId);
-                    const saldoAtual = originalMaterial ? originalMaterial.balance : 0;
-                    
-                    const faltaEstoque = item.qtyRequested > saldoAtual;
-                    const stockBadge = faltaEstoque 
-                        ? `<span class="text-red-600 font-bold text-xs bg-red-50 px-2 py-1 rounded">⚠️ Estoque Insuficiente (Saldo: ${saldoAtual})</span>`
-                        : `<span class="text-emerald-700 text-xs bg-emerald-50 px-2 py-1 rounded">✓ Disponível (Saldo: ${saldoAtual})</span>`;
-
-                    itemsHtml += `
-                        <tr class="border-b border-gray-100 text-sm">
-                            <td class="py-2.5 px-1 text-gray-800">
-                                <span class="font-mono text-xs text-slate-500 mr-2">[${item.code || 'S/C'}</span>
-                                ${item.name}
-                            </td>
-                            <td class="py-2.5 px-1 text-center text-gray-500">${item.unit}</td>
-                            <td class="py-2.5 px-1 text-center font-bold text-gray-800">${item.qtyRequested}</td>
-                            <td class="py-2.5 px-1 text-right">${stockBadge}</td>
-                        </tr>
-                    `;
-                });
-
                 html += `
                     <div class="bg-white border border-gray-200 shadow-sm rounded-xl overflow-hidden hover:border-gray-300 transition-all">
                         <div class="bg-gray-50 border-b border-gray-200 p-4 flex flex-col sm:flex-row justify-between sm:items-center gap-3">
@@ -1051,33 +1061,19 @@
                                 <p class="text-xs text-gray-500">${req.userSector} • Solicitado em: ${req.date}</p>
                             </div>
                             <div class="flex gap-2">
-                                <button onclick="imprimirPedido('${req.id}')" class="border border-gray-300 hover:bg-gray-100 text-gray-700 font-medium text-xs px-3 py-1.5 rounded transition-all flex items-center gap-1.5">
-                                    🖨️ Imprimir Pedido
+                                <button onclick="abrirModalPedido('${req.id}')" class="bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs px-3.5 py-1.5 rounded-lg transition-all flex items-center gap-1.5 shadow-sm">
+                                    👀 Ver Pedido
                                 </button>
-                                <button onclick="imprimirOrdemFornecimento('${req.id}')" class="border border-blue-200 hover:bg-blue-50 text-blue-700 font-semibold text-xs px-3 py-1.5 rounded transition-all flex items-center gap-1.5">
+                                <button onclick="imprimirOrdemFornecimento('${req.id}')" class="border border-blue-200 hover:bg-blue-50 text-blue-700 font-semibold text-xs px-3 py-1.5 rounded-lg transition-all flex items-center gap-1.5">
                                     📜 Imprimir Ordem de Fornecimento
                                 </button>
                             </div>
                         </div>
                         <div class="p-4">
-                            <div class="mb-4 bg-amber-50 border border-amber-200 rounded-lg p-3 text-sm">
+                            <div class="bg-amber-50 border border-amber-200 rounded-lg p-3 text-sm">
                                 <span class="block text-xs font-bold text-amber-800 uppercase mb-1">Justificativa de Uso</span>
                                 <p class="text-gray-700 italic">"${req.justification || 'Não informada'}"</p>
                             </div>
-
-                            <table class="w-full text-left border-collapse">
-                                <thead>
-                                    <tr class="text-xs text-gray-400 uppercase border-b border-gray-200 pb-2">
-                                        <th class="pb-2 font-medium">Material</th>
-                                        <th class="pb-2 text-center font-medium">Unidade</th>
-                                        <th class="pb-2 text-center font-medium">Pedida</th>
-                                        <th class="pb-2 text-right font-medium">Situação de Estoque</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    ${itemsHtml}
-                                </tbody>
-                            </table>
                         </div>
                         <div class="bg-gray-50 border-t border-gray-100 p-4 flex justify-end gap-3">
                             <button onclick="recusarSolicitacao('${req.id}')" class="bg-red-50 hover:bg-red-100 text-red-700 font-semibold text-sm px-4 py-2 rounded-lg transition-all">
@@ -1091,6 +1087,31 @@
                 `;
             });
             container.innerHTML = html;
+        }
+
+        // Permite ao Administrador diminuir/ajustar a quantidade da solicitação em tempo real por dentro do modal
+        function atualizarQuantidadeSolicitadaModal(requestId, materialId, novaQtd) {
+            const valor = parseInt(novaQtd);
+            if (isNaN(valor) || valor < 0) {
+                alert("Por favor, digite uma quantidade válida (maior ou igual a 0).");
+                return;
+            }
+
+            const req = state.requests.find(r => r.id === requestId);
+            if (!req) return;
+
+            // Mapeia e atualiza o item com a nova quantidade digitada
+            const itemsAtualizados = req.items.map(item => {
+                if (item.materialId === materialId) {
+                    return { ...item, qtyRequested: valor };
+                }
+                return item;
+            });
+
+            // Atualiza diretamente no banco Firestore (o snapshot do Firebase atualizará o modal automaticamente)
+            db.collection("requests").doc(requestId).update({
+                items: itemsAtualizados
+            }).catch(err => alert("Erro ao atualizar quantidade no banco de dados: " + err.message));
         }
 
         function aprovarSolicitacao(id) {
@@ -1162,11 +1183,9 @@
                     statusBadge = '<span class="bg-red-100 text-red-800 text-xs px-2.5 py-1 rounded-full font-semibold">Recusado</span>';
                 }
 
-                let itensResumo = req.items.map(i => `<span class="font-mono text-[11px] text-gray-500">[${i.code || 'S/C'}]</span> ${i.qtyRequested}x ${i.name}`).join('<br>');
-                
                 let detalheJustificativa = `
-                    <div class="mt-2 text-xs text-gray-500 border-t border-gray-100 pt-1 leading-relaxed">
-                        <strong class="text-gray-700">Justif:</strong> "${req.justification || 'Não detalhado'}"
+                    <div class="text-xs text-gray-600 leading-relaxed italic">
+                        "${req.justification || 'Não detalhado'}"
                     </div>
                 `;
 
@@ -1176,13 +1195,12 @@
                         <td class="py-3 px-4 font-bold text-gray-900">${req.userName}</td>
                         <td class="py-3 px-4 text-gray-600">${req.userSector}</td>
                         <td class="py-3 px-4 text-gray-700 leading-snug">
-                            <div>${itensResumo}</div>
                             ${detalheJustificativa}
                         </td>
                         <td class="py-3 px-4 text-center">${statusBadge}</td>
                         <td class="py-3 px-4 text-center space-x-1 whitespace-nowrap">
-                            <button onclick="imprimirPedido('${req.id}')" class="text-blue-600 hover:underline text-xs">Ver Pedido</button>
-                            ${req.status === 'approved' ? `| <button onclick="imprimirOrdemFornecimento('${req.id}')" class="text-emerald-700 hover:underline text-xs font-semibold">Ordem Fornec.</button>` : ''}
+                            <button onclick="abrirModalPedido('${req.id}')" class="text-blue-600 hover:underline text-xs font-semibold">Ver Pedido</button>
+                            ${req.status === 'approved' ? `| <button onclick="imprimirOrdemFornecimento('${req.id}')" class="text-emerald-700 hover:underline text-xs">Ordem Fornec.</button>` : ''}
                             | <button onclick="excluirSolicitacaoLogica('${req.id}')" class="text-red-500 hover:underline text-xs">Excluir</button>
                         </td>
                     </tr>
@@ -1214,13 +1232,177 @@
             }
         }
 
-        // ================= SISTEMA DE IMPRESSÕES E RELATÓRIOS =================
+        // ================= CONTROLE DO MODAL DE VISUALIZAÇÃO DE PEDIDOS (VER PEDIDO) =================
+
+        function abrirModalPedido(id) {
+            idPedidoAberto = id;
+            const req = state.requests.find(r => r.id === id);
+            if (!req) return;
+
+            const modal = document.getElementById('modal-ver-pedido');
+            const corpo = document.getElementById('modal-pedido-corpo');
+            const botoes = document.getElementById('modal-pedido-botoes');
+
+            let itemsHtml = '';
+            
+            // Se o pedido for pendente, o admin pode alterar as quantidades por dentro do modal
+            if (req.status === 'pending') {
+                req.items.forEach(item => {
+                    const originalMaterial = state.materials.find(m => m.id === item.materialId);
+                    const saldoAtual = originalMaterial ? originalMaterial.balance : 0;
+                    
+                    const faltaEstoque = item.qtyRequested > saldoAtual;
+                    const stockBadge = faltaEstoque 
+                        ? `<span class="text-red-600 font-bold text-[11px] bg-red-50 px-2 py-1 rounded">⚠️ Estoque Insuficiente (Saldo: ${saldoAtual})</span>`
+                        : `<span class="text-emerald-700 text-[11px] bg-emerald-50 px-2 py-1 rounded">✓ Disponível (Saldo: ${saldoAtual})</span>`;
+
+                    itemsHtml += `
+                        <tr class="border-b border-gray-100 text-xs">
+                            <td class="py-2.5 px-1 text-gray-800">
+                                <span class="font-mono text-[10px] text-slate-500 mr-2">[${item.code || 'S/C'}]</span>
+                                ${item.name}
+                            </td>
+                            <td class="py-2.5 px-1 text-center text-gray-500">${item.unit}</td>
+                            <td class="py-2.5 px-1 text-center">
+                                <input type="number" min="0" value="${item.qtyRequested}" 
+                                    onchange="atualizarQuantidadeSolicitadaModal('${req.id}', '${item.materialId}', this.value)" 
+                                    class="w-16 text-center bg-white border border-gray-300 rounded p-1 text-xs font-bold focus:ring-1 focus:ring-blue-500 outline-none">
+                            </td>
+                            <td class="py-2.5 px-1 text-right">${stockBadge}</td>
+                        </tr>
+                    `;
+                });
+            } else {
+                // Se já estiver processado, exibe como texto informativo simples
+                req.items.forEach(item => {
+                    itemsHtml += `
+                        <tr class="border-b border-gray-100 text-xs">
+                            <td class="py-2.5 px-1 text-gray-800">
+                                <span class="font-mono text-[10px] text-slate-500 mr-2">[${item.code || 'S/C'}]</span>
+                                ${item.name}
+                            </td>
+                            <td class="py-2.5 px-1 text-center text-gray-500">${item.unit}</td>
+                            <td class="py-2.5 px-1 text-center font-bold text-gray-950">${item.qtyRequested}</td>
+                            <td class="py-2.5 px-1 text-right text-gray-400 font-semibold">Processado</td>
+                        </tr>
+                    `;
+                });
+            }
+
+            const statusBadge = req.status === 'pending' 
+                ? '<span class="bg-amber-100 text-amber-800 text-[11px] px-2.5 py-1 rounded-full font-semibold uppercase">Pendente</span>'
+                : req.status === 'approved'
+                    ? '<span class="bg-emerald-100 text-emerald-800 text-[11px] px-2.5 py-1 rounded-full font-semibold uppercase">Aprovado</span>'
+                    : '<span class="bg-red-100 text-red-800 text-[11px] px-2.5 py-1 rounded-full font-semibold uppercase">Recusado</span>';
+
+            corpo.innerHTML = `
+                <div class="grid grid-cols-2 gap-4 bg-gray-50 p-4 rounded-xl border border-gray-200 text-xs">
+                    <div>
+                        <p class="text-gray-500 font-semibold">Solicitante:</p>
+                        <p class="font-extrabold text-gray-950 text-sm">${req.userName}</p>
+                        <p class="text-gray-600">${req.userSector}</p>
+                    </div>
+                    <div class="text-right">
+                        <p class="text-gray-500 font-semibold">Data:</p>
+                        <p class="font-semibold text-gray-950">${req.date}</p>
+                        <div class="mt-1.5">${statusBadge}</div>
+                    </div>
+                </div>
+
+                <div class="bg-amber-50 border border-amber-200 rounded-lg p-3 text-xs">
+                    <span class="block text-[11px] font-bold text-amber-800 uppercase mb-1">Justificativa de Uso</span>
+                    <p class="text-gray-700 italic">"${req.justification || 'Não informada'}"</p>
+                </div>
+
+                <div>
+                    <h4 class="text-xs font-bold text-gray-700 uppercase mb-2">Materiais do Pedido</h4>
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left border-collapse">
+                            <thead>
+                                <tr class="text-[11px] text-gray-400 uppercase border-b border-gray-200 pb-2">
+                                    <th class="pb-2 font-semibold">Material</th>
+                                    <th class="pb-2 text-center font-semibold">Unidade</th>
+                                    <th class="pb-2 text-center font-semibold">Qtd. Solicitada</th>
+                                    <th class="pb-2 text-right font-semibold">Situação</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${itemsHtml}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            `;
+
+            let botoesHtml = '';
+            
+            // Renderiza ações de pendência por dentro do modal se necessário
+            if (req.status === 'pending') {
+                botoesHtml += `
+                    <button onclick="recusarSolicitacaoModal('${req.id}')" class="bg-red-50 hover:bg-red-100 text-red-700 font-semibold text-xs px-4 py-2 rounded-lg transition-all">
+                        Recusar Solicitação
+                    </button>
+                    <button onclick="aprovarSolicitacaoModal('${req.id}')" class="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs px-4 py-2 rounded-lg shadow-sm transition-all">
+                        Liberar & Deduzir
+                    </button>
+                `;
+            }
+
+            // Ações universais
+            botoesHtml += `
+                <button onclick="imprimirPedido('${req.id}')" class="bg-blue-700 hover:bg-blue-800 text-white font-semibold text-xs px-4 py-2 rounded-lg transition-all flex items-center gap-1.5">
+                    🖨️ Imprimir Pedido
+                </button>
+                ${req.status === 'approved' ? `
+                    <button onclick="imprimirOrdemFornecimento('${req.id}')" class="bg-emerald-700 hover:bg-emerald-800 text-white font-semibold text-xs px-4 py-2 rounded-lg transition-all flex items-center gap-1.5">
+                        📜 Ordem Fornec.
+                    </button>
+                ` : ''}
+                <button onclick="fecharModalPedido()" class="bg-gray-200 hover:bg-gray-300 text-gray-700 font-semibold text-xs px-4 py-2 rounded-lg transition-all">
+                    Fechar
+                </button>
+            `;
+
+            botoes.innerHTML = botoesHtml;
+
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+        }
+
+        function fecharModalPedido() {
+            const modal = document.getElementById('modal-ver-pedido');
+            modal.classList.add('hidden');
+            modal.classList.remove('flex');
+            idPedidoAberto = null; // Libera o ID aberto
+        }
+
+        function aprovarSolicitacaoModal(id) {
+            aprovarSolicitacao(id);
+            fecharModalPedido();
+        }
+
+        function recusarSolicitacaoModal(id) {
+            recusarSolicitacao(id);
+            fecharModalPedido();
+        }
+
+        // ================= SISTEMA DE IMPRESSÕES E RELATÓRIOS (CORRIGIDO) =================
 
         function runPrint(html) {
             const printArea = document.getElementById('print-area');
             printArea.innerHTML = html;
-            window.print();
-            printArea.innerHTML = '';
+            
+            // Ouvinte de evento assíncrono para apagar o conteúdo APENAS quando o processo de impressão for concluído ou cancelado
+            const limparDepoisDeImprimir = () => {
+                printArea.innerHTML = '';
+                window.removeEventListener('afterprint', limparDepoisDeImprimir);
+            };
+            window.addEventListener('afterprint', limparDepoisDeImprimir);
+
+            // Pequeno delay de 100ms para garantir renderização do DOM antes da chamada do driver de impressão
+            setTimeout(() => {
+                window.print();
+            }, 100);
         }
 
         function imprimirEstoqueCompleto() {
@@ -1276,13 +1458,13 @@
             let trs = '';
             req.items.forEach(item => {
                 trs += `
-                    <tr style="border-bottom: 1px solid #eee;">
-                        <td style="padding: 8px 12px; text-align: left;">
-                            <span style="font-family: monospace; font-size: 11px; background: #f1f5f9; padding: 2px 6px; border-radius: 4px; margin-right: 8px; color: #475569; font-weight: bold;">${item.code || 'S/C'}</span>
+                    <tr style="border-bottom: 1px solid #e2e8f0;">
+                        <td style="padding: 10px 12px; text-align: left; color: #1e293b;">
+                            <span style="font-family: monospace; font-size: 11px; background: #e2e8f0; padding: 2px 6px; border-radius: 4px; margin-right: 8px; color: #334155; font-weight: bold;">${item.code || 'S/C'}</span>
                             ${item.name}
                         </td>
-                        <td style="padding: 8px 12px; text-align: center;">${item.unit}</td>
-                        <td style="padding: 8px 12px; text-align: center; font-weight: bold;">${item.qtyRequested}</td>
+                        <td style="padding: 10px 12px; text-align: center; color: #475569;">${item.unit}</td>
+                        <td style="padding: 10px 12px; text-align: center; font-weight: bold; color: #0f172a; font-size: 14px;">${item.qtyRequested}</td>
                     </tr>
                 `;
             });
@@ -1290,39 +1472,43 @@
             const adminName = req.approvedBy || (state.currentUser && state.currentUser.role === 'admin' ? state.currentUser.name : 'Almoxarife');
 
             const template = `
-                <div style="font-family: Arial, sans-serif; padding: 40px; border: 1px solid #ccc; max-width: 800px; margin: auto;">
-                    <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #2563eb; padding-bottom: 15px; margin-bottom: 20px;">
+                <div style="font-family: system-ui, -apple-system, sans-serif; padding: 40px; max-width: 800px; margin: auto;">
+                    <!-- Cabeçalho Organizado -->
+                    <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 3px solid #1e3a8a; padding-bottom: 15px; margin-bottom: 20px;">
                         <div>
-                            <h1 style="margin: 0; font-size: 22px; color: #2563eb;">PEDIDO DE SOLICITAÇÃO</h1>
-                            <p style="margin: 3px 0 0 0; font-size: 12px; color: #666;">Controle Interno de Despensa</p>
+                            <h1 style="margin: 0; font-size: 24px; font-weight: 800; color: #1e3a8a; text-transform: uppercase; letter-spacing: 0.5px;">Pedido de Solicitação</h1>
+                            <p style="margin: 3px 0 0 0; font-size: 12px; color: #64748b; font-weight: 600;">Controle Interno de Despensa & Almoxarifado</p>
                         </div>
                         <div style="text-align: right;">
-                            <span style="background-color: #e2e8f0; padding: 5px 10px; border-radius: 4px; font-weight: bold; font-size: 12px;">ID: #${req.id.slice(-6)}</span>
+                            <span style="background-color: #1e3a8a; color: white; padding: 6px 12px; border-radius: 6px; font-weight: bold; font-size: 13px; letter-spacing: 1px;">ID: #${req.id.slice(-6)}</span>
                         </div>
                     </div>
                     
-                    <div style="display: flex; justify-content: space-between; background: #f8fafc; padding: 15px; border-radius: 6px; margin-bottom: 20px; font-size: 14px;">
+                    <!-- Meta Informações -->
+                    <div style="display: flex; justify-content: space-between; background: #f8fafc; border: 1px solid #e2e8f0; padding: 15px; border-radius: 8px; margin-bottom: 20px; font-size: 14px;">
                         <div>
-                            <strong>Solicitante:</strong> ${req.userName}<br>
-                            <strong>Setor:</strong> ${req.userSector}
+                            <p style="margin: 0 0 6px 0; color: #475569;"><strong>Solicitante:</strong> <span style="color: #0f172a; font-weight: 600;">${req.userName}</span></p>
+                            <p style="margin: 0; color: #475569;"><strong>Setor de Destino:</strong> <span style="color: #0f172a; font-weight: 600;">${req.userSector}</span></p>
                         </div>
                         <div style="text-align: right;">
-                            <strong>Data:</strong> ${req.date}<br>
-                            <strong>Status:</strong> ${req.status === 'pending' ? 'AGUARDANDO LIBERAÇÃO' : req.status.toUpperCase()}
+                            <p style="margin: 0 0 6px 0; color: #475569;"><strong>Data do Pedido:</strong> <span style="color: #0f172a; font-weight: 600;">${req.date}</span></p>
+                            <p style="margin: 0; color: #475569;"><strong>Status Atual:</strong> <span style="color: #1e3a8a; font-weight: bold; text-transform: uppercase;">${req.status === 'pending' ? 'AGUARDANDO LIBERAÇÃO' : req.status === 'approved' ? 'APROVADO' : 'RECUSADO'}</span></p>
                         </div>
                     </div>
 
-                    <div style="background-color: #fffbeb; border: 1px solid #fef3c7; padding: 12px 15px; border-radius: 6px; margin-bottom: 25px; font-size: 13px;">
-                        <strong style="color: #b45309; display: block; margin-bottom: 4px; text-transform: uppercase; font-size: 11px;">Finalidade / Justificativa informada:</strong>
-                        <span style="font-style: italic; color: #374151;">"${req.justification || 'Não informada'}"</span>
+                    <!-- Justificativa -->
+                    <div style="background-color: #fffbeb; border: 1px solid #fef3c7; padding: 15px; border-radius: 8px; margin-bottom: 25px; font-size: 13px; line-height: 1.5;">
+                        <strong style="color: #b45309; display: block; margin-bottom: 5px; text-transform: uppercase; font-size: 11px; letter-spacing: 0.5px;">Finalidade / Justificativa Informada:</strong>
+                        <span style="font-style: italic; color: #334155; font-size: 13.5px;">"${req.justification || 'Não informada pelo solicitante.'}"</span>
                     </div>
 
-                    <table style="width: 100%; border-collapse: collapse;">
+                    <!-- Tabela de Materiais Organizada -->
+                    <table style="width: 100%; border-collapse: collapse; margin-bottom: 40px;">
                         <thead>
-                            <tr style="background-color: #2563eb; color: #ffffff;">
-                                <th style="padding: 10px 12px; text-align: left; font-size: 13px; color: #ffffff;">Material Solicitado</th>
-                                <th style="padding: 10px 12px; text-align: center; width: 120px; font-size: 13px; color: #ffffff;">Unidade</th>
-                                <th style="padding: 10px 12px; text-align: center; width: 120px; font-size: 13px; color: #ffffff;">Qtd. Desejada</th>
+                            <tr style="background-color: #1e3a8a; color: #ffffff;">
+                                <th style="padding: 12px; text-align: left; font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px; color: #ffffff; border-radius: 6px 0 0 0;">Material Solicitado</th>
+                                <th style="padding: 12px; text-align: center; width: 140px; font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px; color: #ffffff;">Unidade</th>
+                                <th style="padding: 12px; text-align: center; width: 140px; font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px; color: #ffffff; border-radius: 0 6px 0 0;">Qtd. Desejada</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -1330,14 +1516,15 @@
                         </tbody>
                     </table>
 
-                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 40px; margin-top: 80px; font-size: 13px;">
-                        <div style="text-align: center; border-top: 1px solid #000; padding-top: 8px;">
-                            <p style="margin: 0;"><strong>${req.userName}</strong></p>
-                            <p style="margin: 4px 0 0 0; font-size: 11px; color: #555;">Assinatura do Solicitante</p>
+                    <!-- Linhas de Assinatura posicionadas lado a lado -->
+                    <div style="display: flex; justify-content: space-between; gap: 50px; margin-top: 80px; font-size: 13px;">
+                        <div style="text-align: center; border-top: 1px solid #cbd5e1; flex: 1; padding-top: 10px;">
+                            <p style="margin: 0; font-weight: bold; color: #1e293b;">${req.userName}</p>
+                            <p style="margin: 4px 0 0 0; font-size: 11px; color: #64748b; text-transform: uppercase; font-weight: 600;">Assinatura do Solicitante</p>
                         </div>
-                        <div style="text-align: center; border-top: 1px solid #000; padding-top: 8px;">
-                            <p style="margin: 0;"><strong>${adminName}</strong></p>
-                            <p style="margin: 4px 0 0 0; font-size: 11px; color: #555;">Assinatura do Administrador</p>
+                        <div style="text-align: center; border-top: 1px solid #cbd5e1; flex: 1; padding-top: 10px;">
+                            <p style="margin: 0; font-weight: bold; color: #1e293b;">${adminName}</p>
+                            <p style="margin: 4px 0 0 0; font-size: 11px; color: #64748b; text-transform: uppercase; font-weight: 600;">Assinatura do Responsável</p>
                         </div>
                     </div>
                 </div>
@@ -1352,14 +1539,14 @@
             let trs = '';
             req.items.forEach(item => {
                 trs += `
-                    <tr style="border-bottom: 1px solid #ddd;">
-                        <td style="padding: 8px 12px; text-align: left;">
-                            <span style="font-family: monospace; font-size: 11px; background: #f1f5f9; padding: 2px 6px; border-radius: 4px; margin-right: 8px; color: #475569; font-weight: bold;">${item.code || 'S/C'}</span>
+                    <tr style="border-bottom: 1px solid #e2e8f0;">
+                        <td style="padding: 10px 12px; text-align: left; color: #1e293b;">
+                            <span style="font-family: monospace; font-size: 11px; background: #e2e8f0; padding: 2px 6px; border-radius: 4px; margin-right: 8px; color: #334155; font-weight: bold;">${item.code || 'S/C'}</span>
                             ${item.name}
                         </td>
-                        <td style="padding: 8px 12px; text-align: center;">${item.unit}</td>
-                        <td style="padding: 8px 12px; text-align: center; font-weight: bold;">${item.qtyRequested}</td>
-                        <td style="padding: 8px 12px; text-align: center; border-left: 1px solid #ddd; width: 100px;">[ &nbsp; ] OK</td>
+                        <td style="padding: 10px 12px; text-align: center; color: #475569;">${item.unit}</td>
+                        <td style="padding: 10px 12px; text-align: center; font-weight: bold; color: #1e3a8a; font-size: 14px;">${item.qtyRequested}</td>
+                        <td style="padding: 10px 12px; text-align: center; border-left: 1px solid #e2e8f0; width: 110px; color: #64748b; font-weight: bold; font-size: 11px;">[ &nbsp; &nbsp; ] OK</td>
                     </tr>
                 `;
             });
@@ -1367,34 +1554,38 @@
             const adminName = req.approvedBy || (state.currentUser && state.currentUser.role === 'admin' ? state.currentUser.name : 'Almoxarife');
 
             const template = `
-                <div style="font-family: Arial, sans-serif; padding: 40px; border: 2px solid #1e293b; max-width: 800px; margin: auto;">
-                    <div style="text-align: center; border-bottom: 2px dashed #1e293b; padding-bottom: 15px; margin-bottom: 20px;">
-                        <h1 style="margin: 0; font-size: 24px; letter-spacing: 1px; font-weight: 800; color: #1e293b;">ORDEM DE FORNECIMENTO</h1>
-                        <p style="margin: 5px 0 0 0; font-size: 13px; font-weight: bold; color: #475569;">GUIA DE LIBERAÇÃO E SAÍDA DE MATERIAIS</p>
+                <div style="font-family: system-ui, -apple-system, sans-serif; padding: 40px; max-width: 800px; margin: auto; border: 2px solid #0f172a; border-radius: 12px;">
+                    <!-- Topo -->
+                    <div style="text-align: center; border-bottom: 2px dashed #0f172a; padding-bottom: 15px; margin-bottom: 20px;">
+                        <h1 style="margin: 0; font-size: 24px; letter-spacing: 1.5px; font-weight: 900; color: #0f172a; text-transform: uppercase;">Ordem de Fornecimento</h1>
+                        <p style="margin: 5px 0 0 0; font-size: 12px; font-weight: bold; color: #475569; letter-spacing: 1px;">GUIA OFICIAL DE LIBERAÇÃO E SAÍDA DE MATERIAIS</p>
                     </div>
 
-                    <div style="display: flex; justify-content: space-between; font-size: 14px; margin-bottom: 20px;">
+                    <!-- Dados Principais -->
+                    <div style="display: flex; justify-content: space-between; font-size: 14px; margin-bottom: 20px; line-height: 1.6;">
                         <div>
-                            <p style="margin: 4px 0;"><strong>Destinatário / Requerente:</strong> ${req.userName}</p>
-                            <p style="margin: 4px 0;"><strong>Destino / Setor:</strong> ${req.userSector}</p>
+                            <p style="margin: 0;"><strong>Destinatário / Requerente:</strong> <span style="color: #0f172a; font-weight: 600;">${req.userName}</span></p>
+                            <p style="margin: 0;"><strong>Destino / Setor:</strong> <span style="color: #0f172a; font-weight: 600;">${req.userSector}</span></p>
                         </div>
                         <div style="text-align: right;">
-                            <p style="margin: 4px 0;"><strong>No. Controle:</strong> OF-${req.id.slice(-6)}</p>
-                            <p style="margin: 4px 0;"><strong>Data de Processamento:</strong> ${req.dateProcessed || req.date}</p>
+                            <p style="margin: 0;"><strong>Nº de Controle:</strong> <span style="font-family: monospace; font-weight: bold; color: #1e3a8a;">OF-${req.id.slice(-6)}</span></p>
+                            <p style="margin: 0;"><strong>Data de Processamento:</strong> <span style="color: #0f172a; font-weight: 600;">${req.dateProcessed || req.date}</span></p>
                         </div>
                     </div>
 
-                    <div style="font-size: 13px; background-color: #f1f5f9; padding: 12px; border-radius: 6px; margin-bottom: 20px; border-left: 4px solid #475569;">
-                        <strong>Justificativa registrada:</strong> "${req.justification || 'Não detalhada'}"
+                    <!-- Justificativa -->
+                    <div style="font-size: 13px; background-color: #f1f5f9; padding: 12px; border-radius: 8px; margin-bottom: 25px; border-left: 5px solid #0f172a; line-height: 1.5;">
+                        <strong style="color: #0f172a;">Motivo do Fornecimento:</strong> "${req.justification || 'Não detalhada'}"
                     </div>
 
-                    <table style="width: 100%; border-collapse: collapse; margin-bottom: 40px;">
+                    <!-- Tabela de Itens Autêntica -->
+                    <table style="width: 100%; border-collapse: collapse; margin-bottom: 50px;">
                         <thead>
-                            <tr style="background-color: #1e293b; color: #ffffff;">
-                                <th style="padding: 10px 12px; text-align: left; font-size: 12px; color: #ffffff;">Especificação do Item</th>
-                                <th style="padding: 10px 12px; text-align: center; width: 120px; font-size: 12px; color: #ffffff;">Unidade</th>
-                                <th style="padding: 10px 12px; text-align: center; width: 100px; font-size: 12px; color: #ffffff;">Qtd. Autorizada</th>
-                                <th style="padding: 10px 12px; text-align: center; width: 100px; font-size: 12px; border-left: 1px solid #ddd; color: #ffffff;">Conferência</th>
+                            <tr style="background-color: #0f172a; color: #ffffff;">
+                                <th style="padding: 12px; text-align: left; font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px; color: #ffffff;">Especificação do Item</th>
+                                <th style="padding: 12px; text-align: center; width: 130px; font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px; color: #ffffff;">Unidade</th>
+                                <th style="padding: 12px; text-align: center; width: 130px; font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px; color: #ffffff;">Qtd. Autorizada</th>
+                                <th style="padding: 12px; text-align: center; width: 120px; font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px; border-left: 1px solid #475569; color: #ffffff;">Conferência</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -1402,14 +1593,15 @@
                         </tbody>
                     </table>
 
-                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 40px; margin-top: 80px; font-size: 13px;">
-                        <div style="text-align: center; border-top: 1px solid #000; padding-top: 8px;">
-                            <p style="margin: 0;"><strong>${adminName}</strong></p>
-                            <p style="margin: 4px 0 0 0; font-size: 11px; color: #555;">Autorizador da Baixa (Almoxarife)</p>
+                    <!-- Assinaturas de Conferência -->
+                    <div style="display: flex; justify-content: space-between; gap: 50px; margin-top: 80px; font-size: 13px;">
+                        <div style="text-align: center; border-top: 1px solid #0f172a; flex: 1; padding-top: 10px;">
+                            <p style="margin: 0; font-weight: bold; color: #0f172a;">${adminName}</p>
+                            <p style="margin: 4px 0 0 0; font-size: 11px; color: #475569; text-transform: uppercase; font-weight: 600;">Autorizador da Baixa (Almoxarife)</p>
                         </div>
-                        <div style="text-align: center; border-top: 1px solid #000; padding-top: 8px;">
-                            <p style="margin: 0;"><strong>${req.userName}</strong></p>
-                            <p style="margin: 4px 0 0 0; font-size: 11px; color: #555;">Recebedor (Solicitante)</p>
+                        <div style="text-align: center; border-top: 1px solid #0f172a; flex: 1; padding-top: 10px;">
+                            <p style="margin: 0; font-weight: bold; color: #0f172a;">${req.userName}</p>
+                            <p style="margin: 4px 0 0 0; font-size: 11px; color: #475569; text-transform: uppercase; font-weight: 600;">Recebedor (Solicitante)</p>
                         </div>
                     </div>
                 </div>
