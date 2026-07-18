@@ -488,6 +488,7 @@
                 
                 renderCatalogo();
                 renderEstoqueList();
+                renderTabsMenu(); // Atualiza a aba com a notificação do estoque crítico em tempo real
             });
 
             // 3. Escutar solicitações feitas
@@ -615,10 +616,13 @@
             const nav = document.getElementById('nav-tabs');
             const pendingCount = state.requests.filter(r => r.status === 'pending').length;
             
+            // Nova constante que filtra e conta quantos materiais possuem saldo menor que 5
+            const lowStockCount = state.materials.filter(m => m.balance < 5).length;
+            
             const tabs = [
                 { id: 'solicitacao', label: '📝 Fazer Solicitação', adminOnly: false },
                 { id: 'usuarios', label: '👤 Usuários', adminOnly: true },
-                { id: 'materiais', label: '📦 Materiais (Almoxarifado)', adminOnly: true },
+                { id: 'materiais', label: '📦 Materiais (Almoxarifado)', adminOnly: true, badge: lowStockCount },
                 { id: 'pendentes', label: '⏳ Pendentes', adminOnly: true, badge: pendingCount },
                 { id: 'historico', label: '📜 Histórico', adminOnly: true }
             ];
@@ -703,17 +707,21 @@
                     ? `<span class="bg-blue-100 text-blue-800 text-[11px] font-semibold px-2 py-0.5 rounded-full">Na lista</span>`
                     : `<button onclick="addToCart('${m.id}')" class="bg-blue-600 hover:bg-blue-700 text-white text-[11px] font-semibold py-1 px-2.5 rounded shadow transition-all">Selecionar</button>`;
 
-                // Alerta visual de estoque crítico (< 5 unidades) no catálogo
-                const isLowStock = m.balance < 5;
+                // AJUSTADO: Alerta visual de estoque crítico (< 5 unidades) renderiza APENAS se o usuário for administrador
+                const isLowStock = m.balance < 5 && state.currentUser.role === 'admin';
                 const codeClass = isLowStock 
                     ? "bg-red-100 text-red-700 border border-red-200 font-extrabold" 
                     : "bg-slate-100 text-slate-600 font-semibold";
 
+                // Modificação: Altera a cor de fundo da linha inteira e insere badge de notificação
+                const rowClass = isLowStock ? "bg-red-50 hover:bg-red-100" : "hover:bg-gray-50";
+                const notificationHtml = isLowStock ? `<span class="bg-red-200 text-red-800 text-[10px] font-bold px-1.5 py-0.5 rounded ml-2 inline-flex items-center gap-1 animate-pulse">⚠️ BAIXO ESTOQUE</span>` : '';
+
                 html += `
-                    <tr class="hover:bg-gray-50 transition-colors text-xs">
+                    <tr class="${rowClass} transition-colors text-xs">
                         <td class="py-2 px-4 font-medium text-gray-950">
                             <span class="text-[10px] font-mono ${codeClass} px-1.5 py-0.5 rounded mr-2">${m.code || 'S/C'}</span>
-                            ${m.name}
+                            ${m.name} ${notificationHtml}
                         </td>
                         <td class="py-2 px-4 text-center text-gray-500">${m.unit}</td>
                         <td class="py-2 px-4 text-center font-bold text-gray-700 col-saldo">${m.balance}</td>
@@ -760,8 +768,8 @@
                 const material = state.materials.find(m => m.id === item.materialId);
                 if (!material) return;
 
-                // Alerta visual de estoque crítico no carrinho lateral (< 5 unidades)
-                const isLowStock = material.balance < 5;
+                // AJUSTADO: Alerta visual de estoque crítico no carrinho lateral (< 5 unidades) validado apenas para Administradores
+                const isLowStock = material.balance < 5 && state.currentUser.role === 'admin';
                 const codeClass = isLowStock ? "text-red-600 font-bold" : "text-gray-500";
 
                 html += `
@@ -1053,10 +1061,14 @@
                     ? "text-red-600 bg-red-50 border border-red-100 px-1.5 py-0.5 rounded font-extrabold" 
                     : "text-blue-900";
 
+                // Modificação: Altera a cor de fundo da linha inteira e insere badge de notificação no painel admin
+                const rowClass = isLowStock ? "bg-red-50 hover:bg-red-100" : "hover:bg-gray-50";
+                const notificationHtml = isLowStock ? `<span class="bg-red-200 text-red-800 text-[10px] font-bold px-1.5 py-0.5 rounded ml-2 inline-flex items-center gap-1 animate-pulse">⚠️ BAIXO ESTOQUE</span>` : '';
+
                 html += `
-                    <tr class="hover:bg-gray-50">
+                    <tr class="${rowClass}">
                         <td class="py-3 px-4 font-mono text-xs font-bold ${codeClass}">${mat.code || 'S/C'}</td>
-                        <td class="py-3 px-4 font-medium text-gray-900">${mat.name}</td>
+                        <td class="py-3 px-4 font-medium text-gray-900">${mat.name} ${notificationHtml}</td>
                         <td class="py-3 px-4 text-center text-gray-600">${mat.unit}</td>
                         <td class="py-3 px-4 text-center font-bold text-blue-600">${mat.balance}</td>
                         <td class="py-3 px-4 text-center">
@@ -1166,131 +1178,11 @@
                 return item;
             });
 
-            // Atualiza diretamente no banco Firestore (o snapshot do Firebase atualizará o modal automaticamente)
+            // box diretamente no banco Firestore (o snapshot do Firebase atualizará o modal automaticamente)
             db.collection("requests").doc(requestId).update({
                 items: itemsAtualizados
             }).catch(err => alert("Erro ao atualizar quantidade no banco de dados: " + err.message));
         }
-
-        function aprovarSolicitacao(id) {
-            const req = state.requests.find(r => r.id === id);
-            if (!req) return;
-            
-            let erroEstoque = [];
-            req.items.forEach(item => {
-                const originalMaterial = state.materials.find(m => m.id === item.materialId);
-                if (!originalMaterial || originalMaterial.balance < item.qtyRequested) {
-                    erroEstoque.push(item.name);
-                }
-            });
-
-            if (erroEstoque.length > 0) {
-                if (!confirm(`Atenção: Os seguintes itens não possuem saldo suficiente no estoque:\n- ${erroEstoque.join('\n- ')}\n\nDeseja forçar a liberação mesmo assim (o estoque poderá ficar negativo)?`)) {
-                    return;
-                }
-            }
-
-            // Atualiza saldos no Firebase
-            req.items.forEach(item => {
-                const originalMaterial = state.materials.find(m => m.id === item.materialId);
-                if (originalMaterial) {
-                    const novoSaldo = originalMaterial.balance - item.qtyRequested;
-                    db.collection("materials").doc(item.materialId).update({ balance: novoSaldo });
-                }
-            });
-
-            //  Atualiza status da solicitação
-            db.collection("requests").doc(id).update({
-                status: 'approved',
-                dateProcessed: new Date().toLocaleString('pt-BR'),
-                approvedBy: state.currentUser ? state.currentUser.name : 'Administrador'
-            }).then(() => {
-                alert("Solicitação autorizada e baixada do estoque com sucesso!");
-            });
-        }
-
-        function recusarSolicitacao(id) {
-            if (confirm("Deseja realmente recusar esta solicitação?")) {
-                db.collection("requests").doc(id).update({
-                    status: 'rejected',
-                    dateProcessed: new Date().toLocaleString('pt-BR'),
-                    approvedBy: state.currentUser ? state.currentUser.name : 'Administrador'
-                }).then(() => {
-                    alert("Solicitação recusada.");
-                });
-            }
-        }
-
-        // ================= FUNÇÕES: ABA HISTÓRICO (ADMIN) =================
-
-        function renderHistorico() {
-            const tbody = document.getElementById('historico-tbody');
-            const processados = state.requests.filter(r => r.status !== 'pending' && r.ativo !== false);
-
-            if (processados.length === 0) {
-                tbody.innerHTML = `<tr><td colspan="6" class="py-8 text-center text-gray-400">Nenhuma solicitação processada no histórico.</td></tr>`;
-                return;
-            }
-
-            let html = '';
-            processados.forEach(req => {
-                let statusBadge = '';
-                if (req.status === 'approved') {
-                    statusBadge = '<span class="bg-emerald-100 text-emerald-800 text-xs px-2.5 py-1 rounded-full font-semibold">Aprovado</span>';
-                } else {
-                    statusBadge = '<span class="bg-red-100 text-red-800 text-xs px-2.5 py-1 rounded-full font-semibold">Recusado</span>';
-                }
-
-                let detalheJustificativa = `
-                    <div class="text-xs text-gray-600 leading-relaxed italic">
-                        "${req.justification || 'Não detalhado'}"
-                    </div>
-                `;
-
-                html += `
-                    <tr class="hover:bg-gray-50 text-xs sm:text-sm">
-                        <td class="py-3 px-4 text-gray-500 text-xs">${req.dateProcessed || req.date}</td>
-                        <td class="py-3 px-4 font-bold text-gray-900">${req.userName}</td>
-                        <td class="py-3 px-4 text-gray-600">${req.userSector}</td>
-                        <td class="py-3 px-4 text-gray-700 leading-snug">
-                            ${detalheJustificativa}
-                        </td>
-                        <td class="py-3 px-4 text-center">${statusBadge}</td>
-                        <td class="py-3 px-4 text-center space-x-1 whitespace-nowrap">
-                            <button onclick="abrirModalPedido('${req.id}')" class="text-blue-600 hover:underline text-xs font-semibold">Ver Pedido</button>
-                            ${req.status === 'approved' ? `| <button onclick="imprimirOrdemFornecimento('${req.id}')" class="text-emerald-700 hover:underline text-xs">Ordem Fornec.</button>` : ''}
-                            | <button onclick="excluirSolicitacaoLogica('${req.id}')" class="text-red-500 hover:underline text-xs">Excluir</button>
-                        </td>
-                    </tr>
-                `;
-            });
-            tbody.innerHTML = html;
-        }
-
-        function limparHistorico() {
-            if (confirm("Atenção! Isso ocultará todo o histórico de solicitudes processadas do painel. Confirmar?")) {
-                const batch = db.batch();
-                state.requests.forEach(r => {
-                    if (r.status !== 'pending' && r.ativo !== false) {
-                        const ref = db.collection("requests").doc(r.id);
-                        batch.update(ref, { ativo: false });
-                    }
-                });
-                
-                batch.commit().then(() => {
-                    alert("Histórico limpo!");
-                });
-            }
-        }
-
-        function excluirSolicitacaoLogica(id) {
-            if (confirm("Tem certeza que deseja ocultar esta solicitação do histórico?")) {
-                db.collection("requests").doc(id).update({ ativo: false })
-                    .then(() => renderHistorico());
-            }
-        }
-
-        // ================= CONTROLE DO MODAL DE VISUALIZAÇÃO DE PEDIDOS (VER PEDIDO) =================
 
         function abrirModalPedido(id) {
             idPedidoAberto = id;
@@ -1442,6 +1334,126 @@
             modal.classList.add('flex');
         }
 
+        function aprovarSolicitacao(id) {
+            const req = state.requests.find(r => r.id === id);
+            if (!req) return;
+            
+            let erroEstoque = [];
+            req.items.forEach(item => {
+                const originalMaterial = state.materials.find(m => m.id === item.materialId);
+                if (!originalMaterial || originalMaterial.balance < item.qtyRequested) {
+                    erroEstoque.push(item.name);
+                }
+            });
+
+            if (erroEstoque.length > 0) {
+                if (!confirm(`Atenção: Os seguintes itens não possuem saldo suficiente no estoque:\n- ${erroEstoque.join('\n- ')}\n\nDeseja forçar a liberação mesmo assim (o estoque poderá ficar negativo)?`)) {
+                    return;
+                }
+            }
+
+            // Atualiza saldos no Firebase
+            req.items.forEach(item => {
+                const originalMaterial = state.materials.find(m => m.id === item.materialId);
+                if (originalMaterial) {
+                    const novoSaldo = originalMaterial.balance - item.qtyRequested;
+                    db.collection("materials").doc(item.materialId).update({ balance: novoSaldo });
+                }
+            });
+
+            //  Atualiza status da solicitação
+            db.collection("requests").doc(id).update({
+                status: 'approved',
+                dateProcessed: new Date().toLocaleString('pt-BR'),
+                approvedBy: state.currentUser ? state.currentUser.name : 'Administrador'
+            }).then(() => {
+                alert("Solicitação autorizada e baixada do estoque com sucesso!");
+            });
+        }
+
+        function recusarSolicitacao(id) {
+            if (confirm("Deseja realmente recusar esta solicitação?")) {
+                db.collection("requests").doc(id).update({
+                    status: 'rejected',
+                    dateProcessed: new Date().toLocaleString('pt-BR'),
+                    approvedBy: state.currentUser ? state.currentUser.name : 'Administrador'
+                }).then(() => {
+                    alert("Solicitação recusada.");
+                });
+            }
+        }
+
+        // ================= FUNÇÕES: ABA HISTÓRICO (ADMIN) =================
+
+        function renderHistorico() {
+            const tbody = document.getElementById('historico-tbody');
+            const processados = state.requests.filter(r => r.status !== 'pending' && r.ativo !== false);
+
+            if (processados.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="6" class="py-8 text-center text-gray-400">Nenhuma solicitação processada no histórico.</td></tr>`;
+                return;
+            }
+
+            let html = '';
+            processados.forEach(req => {
+                let statusBadge = '';
+                if (req.status === 'approved') {
+                    statusBadge = '<span class="bg-emerald-100 text-emerald-800 text-xs px-2.5 py-1 rounded-full font-semibold">Aprovado</span>';
+                } else {
+                    statusBadge = '<span class="bg-red-100 text-red-800 text-xs px-2.5 py-1 rounded-full font-semibold">Recusado</span>';
+                }
+
+                let detalheJustificativa = `
+                    <div class="text-xs text-gray-600 leading-relaxed italic">
+                        "${req.justification || 'Não detalhado'}"
+                    </div>
+                `;
+
+                html += `
+                    <tr class="hover:bg-gray-50 text-xs sm:text-sm">
+                        <td class="py-3 px-4 text-gray-500 text-xs">${req.dateProcessed || req.date}</td>
+                        <td class="py-3 px-4 font-bold text-gray-900">${req.userName}</td>
+                        <td class="py-3 px-4 text-gray-600">${req.userSector}</td>
+                        <td class="py-3 px-4 text-gray-700 leading-snug">
+                            ${detalheJustificativa}
+                        </td>
+                        <td class="py-3 px-4 text-center">${statusBadge}</td>
+                        <td class="py-3 px-4 text-center space-x-1 whitespace-nowrap">
+                            <button onclick="abrirModalPedido('${req.id}')" class="text-blue-600 hover:underline text-xs font-semibold">Ver Pedido</button>
+                            ${req.status === 'approved' ? `| <button onclick="imprimirOrdemFornecimento('${req.id}')" class="text-emerald-700 hover:underline text-xs">Ordem Fornec.</button>` : ''}
+                            | <button onclick="excluirSolicitacaoLogica('${req.id}')" class="text-red-500 hover:underline text-xs">Excluir</button>
+                        </td>
+                    </tr>
+                `;
+            });
+            tbody.innerHTML = html;
+        }
+
+        function limparHistorico() {
+            if (confirm("Atenção! Isso ocultará todo o histórico de solicitudes processadas do painel. Confirmar?")) {
+                const batch = db.batch();
+                state.requests.forEach(r => {
+                    if (r.status !== 'pending' && r.ativo !== false) {
+                        const ref = db.collection("requests").doc(r.id);
+                        batch.update(ref, { ativo: false });
+                    }
+                });
+                
+                batch.commit().then(() => {
+                    alert("Histórico limpo!");
+                });
+            }
+        }
+
+        function excluirSolicitacaoLogica(id) {
+            if (confirm("Tem certeza que deseja ocultar esta solicitação do histórico?")) {
+                db.collection("requests").doc(id).update({ ativo: false })
+                    .then(() => renderHistorico());
+            }
+        }
+
+        // ================= CONTROLE DO MODAL DE VISUALIZAÇÃO DE PEDIDOS (VER PEDIDO) =================
+
         // Função para fechar o modal
         function fecharModalPedido() {
             const modal = document.getElementById('modal-ver-pedido');
@@ -1582,7 +1594,7 @@
                             <tr style="background-color: #1e3a8a; color: #ffffff;">
                                 <th style="padding: 12px; text-align: left; font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px; color: #ffffff; border-radius: 6px 0 0 0;">Material Solicitado</th>
                                 <th style="padding: 12px; text-align: center; width: 140px; font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px; color: #ffffff;">Unidade</th>
-                                <th style="padding: 12px; text-align: center; width: 140px; font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px; color: #ffffff; border-radius: 0 6px 0 0;">Qtd. Desejada</th>
+                                <th style="padding: 12px; text-align: center; width: 140px; font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px; border-radius: 0 6px 0 0;">Qtd. Desejada</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -1721,12 +1733,12 @@
                     saveState();
                     fecharModalSenha();
                     document.getElementById('alerta-senha-padrao').classList.add('hidden');
-                    alert("Sua senha foi atualizada com sucesso!");
+                    alert("Sua senha foi updated com sucesso!");
                 })
                 .catch(err => alert("Erro ao atualizar senha: " + err.message));
         }
 
-        // --- GERAÇÃO DE CÓDIGO EXCLUSIVO PARA O MATERIAL ---
+        // --- GERAÇÃO DE CÓGIGO EXCLUSIVO PARA O MATERIAL ---
         function gerarCodigoMaterial() {
             let codigo;
             let existe = true;
