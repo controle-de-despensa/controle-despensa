@@ -15,7 +15,7 @@
         /* Estilos específicos para impressão */
         @media print {
             @page {
-                margin: 2.5cm 1.5cm 2cm 1.5cm; /* Define margem superior generosa (cabeçalho) e laterais */
+                margin: 2.5cm 1.5cm 2cm 1.5cm;
             }
             body {
                 background-color: #ffffff !important;
@@ -31,7 +31,6 @@
                 top: 0;
                 width: 100%;
             }
-            /* Força o navegador a renderizar as cores e estilos de fundo corretamente */
             * {
                 -webkit-print-color-adjust: exact !important;
                 print-color-adjust: exact !important;
@@ -41,7 +40,7 @@
             }
         }
 
-        /* Oculta colunas de saldo para não-administradores de forma robusta */
+        /* Oculta colunas de saldo para não-administradores */
         body.not-admin .col-saldo {
             display: none !important;
         }
@@ -335,12 +334,12 @@
             </div>
         </section>
 
-        <!-- ================= ABA: HISTÓRICO (ADMIN) ================= -->
+        <!-- ================= ABA: HISTÓRICO ================= -->
         <section id="pane-historico" class="tab-pane hidden">
             <div class="bg-white p-5 rounded-xl border border-gray-200 shadow-sm">
                 <div class="flex justify-between items-center mb-4">
-                    <h2 class="text-lg font-bold text-gray-900 mb-4">Histórico de Pedidos Processados</h2>
-                    <button onclick="limparHistorico()" class="text-xs text-red-500 hover:text-red-700 font-semibold">
+                    <h2 class="text-lg font-bold text-gray-900" id="historico-titulo">Histórico de Pedidos</h2>
+                    <button id="btn-limpar-historico" onclick="limparHistorico()" class="text-xs text-red-500 hover:text-red-700 font-semibold">
                         Limpar Histórico
                     </button>
                 </div>
@@ -371,19 +370,19 @@
         <p>Sistema de Gestão de Despensa • Firebase Firestore Realtime • 2026</p>
     </footer>
 
-    <!-- ================= MODAL VER DETALHES DO PEDIDO ================= -->
-    <div id="modal-ver-pedido" class="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm hidden items-center justify-center p-4">
-        <div class="bg-white rounded-2xl shadow-2xl border border-gray-100 p-6 w-full max-w-2xl flex flex-col max-h-[90vh]">
-            <div class="flex justify-between items-center mb-4 pb-2 border-b">
-                <h3 class="text-lg font-bold text-blue-900 flex items-center gap-2">
-                    <span>📋</span> Detalhes do Pedido
+    <!-- ================= MODAL VER / EDITAR PEDIDO (OTIMIZADO PARA TELA ÚNICA) ================= -->
+    <div id="modal-ver-pedido" class="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm hidden items-center justify-center p-2 sm:p-4">
+        <div class="bg-white rounded-2xl shadow-2xl border border-gray-100 p-4 sm:p-5 w-full max-w-4xl flex flex-col max-h-[92vh]">
+            <div class="flex justify-between items-center mb-3 pb-2 border-b flex-shrink-0">
+                <h3 class="text-base font-bold text-blue-900 flex items-center gap-2">
+                    <span>📋</span> Detalhes & Edição do Pedido
                 </h3>
                 <button onclick="fecharModalPedido()" class="text-gray-400 hover:text-gray-600 text-lg">✕</button>
             </div>
-            <div id="modal-pedido-corpo" class="overflow-y-auto flex-grow pr-1 space-y-4">
+            <div id="modal-pedido-corpo" class="overflow-y-auto flex-grow pr-1 space-y-3">
                 <!-- Conteúdo dinâmico preenchido via JS -->
             </div>
-            <div class="mt-4 pt-4 border-t flex flex-wrap justify-end gap-2" id="modal-pedido-botoes">
+            <div class="mt-3 pt-3 border-t flex flex-wrap justify-end gap-2 flex-shrink-0" id="modal-pedido-botoes">
                 <!-- Botões dinâmicos de ações preenchidos via JS -->
             </div>
         </div>
@@ -418,7 +417,7 @@
     <!-- Script de Funcionamento Interno -->
     <script>
         // ============================================================
-        // ⚠️ ATENÇÃO: COLE AS SUAS CREDENCIAIS DO FIREBASE LOGO ABAIXO:
+        // ⚠️ CREDENCIAIS DO FIREBASE:
         // ============================================================
         const firebaseConfig = {
             apiKey: "AIzaSyDjZMvdBPNnAFQGeE8NzqHJVmjwqJqWbpQ",
@@ -444,8 +443,9 @@
             cart: [] 
         };
         
-        // Mantém controle do pedido aberto no modal para atualizar as quantidades em tempo real
+        // Controle de Edição do Modal (Cópia Temporária Isolada)
         let idPedidoAberto = null; 
+        let pedidoEmEdicao = null; 
 
         // Escutas em Tempo Real do Firebase (Sincronização Automática)
         function iniciarEscutasFirebase() {
@@ -456,12 +456,10 @@
                     state.users.push({ id: doc.id, ...doc.data() });
                 });
                 
-                // Se o banco estiver zerado, cria os usuários padrão de fábrica
                 if (state.users.length === 0) {
                     criarUsuariosPadrao();
                 }
                 
-                // Atualiza a sessão local caso os dados do usuário ativo tenham mudado
                 if (state.currentUser) {
                     const atualizado = state.users.find(u => u.username === state.currentUser.username);
                     if (atualizado) {
@@ -481,14 +479,13 @@
                     state.materials.push({ id: doc.id, ...doc.data() });
                 });
                 
-                // Se o banco estiver zerado, popula com itens iniciais
                 if (state.materials.length === 0) {
                     criarMateriaisPadrao();
                 }
                 
                 renderCatalogo();
                 renderEstoqueList();
-                renderTabsMenu(); // Atualiza a aba com a notificação do estoque crítico em tempo real
+                renderTabsMenu();
             });
 
             // 3. Escutar solicitações feitas
@@ -498,21 +495,23 @@
                     state.requests.push({ id: doc.id, ...doc.data() });
                 });
                 
-                // Ordenar decrescente pelo timestamp ID
                 state.requests.sort((a, b) => b.id - a.id);
                 
                 renderPendentes();
                 renderHistorico();
                 renderTabsMenu();
 
-                // Se o modal estiver aberto, atualiza as informações dele em tempo real
-                if (idPedidoAberto) {
-                    abrirModalPedido(idPedidoAberto);
+                // Atualiza o modal caso esteja aberto
+                if (idPedidoAberto && pedidoEmEdicao) {
+                    const atualizado = state.requests.find(r => r.id === idPedidoAberto);
+                    if (atualizado && atualizado.status !== pedidoEmEdicao.status) {
+                        pedidoEmEdicao.status = atualizado.status;
+                        renderConteudoModal();
+                    }
                 }
             });
         }
 
-        // Criar dados padrão se o Firestore estiver vazio
         function criarUsuariosPadrao() {
             const defaults = [
                 { name: 'Administrador', sector: 'TI & Almoxarifado', username: 'admin', password: '123', role: 'admin' },
@@ -533,7 +532,6 @@
             defaults.forEach(m => db.collection("materials").add(m));
         }
 
-        // Salvar estado local da sessão activa
         function saveState() {
             if (state.currentUser) {
                 sessionStorage.setItem('dep_current_user', JSON.stringify(state.currentUser));
@@ -570,7 +568,6 @@
             }
         }
 
-        // Realizar logout
         function realizarLogout() {
             state.currentUser = null;
             state.cart = [];
@@ -593,7 +590,6 @@
             loginScreen.classList.add('hidden');
             document.getElementById('header-user-info').innerText = `${state.currentUser.name} [${state.currentUser.sector}]`;
 
-            // Alterna classe no body baseada no perfil para gerenciar o saldo pelo CSS
             if (state.currentUser.role === 'admin') {
                 document.body.classList.remove('not-admin');
             } else {
@@ -615,8 +611,6 @@
             if (!state.currentUser) return;
             const nav = document.getElementById('nav-tabs');
             const pendingCount = state.requests.filter(r => r.status === 'pending').length;
-            
-            // Nova constante que filtra e conta quantos materiais possuem saldo menor que 5
             const lowStockCount = state.materials.filter(m => m.balance < 5).length;
             
             const tabs = [
@@ -624,7 +618,7 @@
                 { id: 'usuarios', label: '👤 Usuários', adminOnly: true },
                 { id: 'materiais', label: '📦 Materiais (Almoxarifado)', adminOnly: true, badge: lowStockCount },
                 { id: 'pendentes', label: '⏳ Pendentes', adminOnly: true, badge: pendingCount },
-                { id: 'historico', label: '📜 Histórico', adminOnly: true }
+                { id: 'historico', label: '📜 Histórico de Pedidos', adminOnly: false }
             ];
 
             let html = '';
@@ -707,13 +701,11 @@
                     ? `<span class="bg-blue-100 text-blue-800 text-[11px] font-semibold px-2 py-0.5 rounded-full">Na lista</span>`
                     : `<button onclick="addToCart('${m.id}')" class="bg-blue-600 hover:bg-blue-700 text-white text-[11px] font-semibold py-1 px-2.5 rounded shadow transition-all">Selecionar</button>`;
 
-                // AJUSTADO: Alerta visual de estoque crítico (< 5 unidades) renderiza APENAS se o usuário for administrador
                 const isLowStock = m.balance < 5 && state.currentUser.role === 'admin';
                 const codeClass = isLowStock 
                     ? "bg-red-100 text-red-700 border border-red-200 font-extrabold" 
                     : "bg-slate-100 text-slate-600 font-semibold";
 
-                // Modificação: Altera a cor de fundo da linha inteira e insere badge de notificação
                 const rowClass = isLowStock ? "bg-red-50 hover:bg-red-100" : "hover:bg-gray-50";
                 const notificationHtml = isLowStock ? `<span class="bg-red-200 text-red-800 text-[10px] font-bold px-1.5 py-0.5 rounded ml-2 inline-flex items-center gap-1 animate-pulse">⚠️ BAIXO ESTOQUE</span>` : '';
 
@@ -732,7 +724,6 @@
             tbody.innerHTML = html;
         }
 
-        // Adiciona um item ao carrinho
         function addToCart(materialId) {
             state.cart.push({ materialId: materialId, qty: 1 });
             renderCarrinho();
@@ -768,7 +759,6 @@
                 const material = state.materials.find(m => m.id === item.materialId);
                 if (!material) return;
 
-                // AJUSTADO: Alerta visual de estoque crítico no carrinho lateral (< 5 unidades) validado apenas para Administradores
                 const isLowStock = material.balance < 5 && state.currentUser.role === 'admin';
                 const codeClass = isLowStock ? "text-red-600 font-bold" : "text-gray-500";
 
@@ -822,6 +812,8 @@
                 date: new Date().toLocaleString('pt-BR'),
                 status: 'pending',
                 justification: justificativaText,
+                justificativaAlteracao: '', 
+                removedItems: [],
                 ativo: true,
                 items: state.cart.map(item => {
                     const mat = state.materials.find(m => m.id === item.materialId);
@@ -830,19 +822,19 @@
                         code: mat.code || 'S/C', 
                         name: mat.name,
                         unit: mat.unit,
-                        qtyRequested: item.qty
+                        qtyRequested: item.qty,
+                        qtyOriginal: item.qty
                     };
                 })
             };
 
-            // Envia para o Firebase Firestore
             db.collection("requests").doc(reqId).set(newRequest)
                 .then(() => {
                     state.cart = []; 
                     justificativaInput.value = ''; 
                     renderCarrinho();
                     renderCatalogo();
-                    alert("Solicitação enviada com sucesso! Aguarde a liberação do administrador.");
+                    alert("Solicitação enviada com sucesso! Você pode acompanhá-la na aba 'Histórico de Pedidos'.");
                 })
                 .catch(err => {
                     alert("Erro ao conectar com a nuvem: " + err.message);
@@ -909,7 +901,6 @@
                 role: userRole.value
             };
 
-            // Cadastra no Firebase
             db.collection("users").add(newUser)
                 .then(() => {
                     nomeInput.value = '';
@@ -982,27 +973,23 @@
             let cadastrados = 0;
             const promessas = [];
 
-            // Primeira passada: Realiza todas as checagens de duplicidade
             for (let i = 0; i < rows.length; i++) {
                 const name = rows[i].querySelector('.mat-name').value.trim();
                 if (!name) continue;
 
                 const nameLower = name.toLowerCase();
 
-                // 1. Confere se já existe no banco/estado global de materiais
                 const jaExisteNoSistema = state.materials.some(m => m.name.trim().toLowerCase() === nameLower);
                 if (jaExisteNoSistema) {
                     duplicadosExistentes.push(name);
                 }
 
-                // 2. Confere se o usuário inseriu o mesmo nome repetido no próprio formulário em massa
                 if (nomesVistosFormulario.includes(nameLower)) {
                     duplicadosFormulario.add(name);
                 }
                 nomesVistosFormulario.push(nameLower);
             }
 
-            // Se for detectado qualquer material duplicado, bloqueia a gravação inteira
             if (duplicadosExistentes.length > 0 || duplicadosFormulario.size > 0) {
                 let mensagemErro = "Operação Barrada! Foram detectados materiais repetidos:\n";
                 
@@ -1017,7 +1004,6 @@
                 return;
             }
 
-            // Segunda passada: Se passou no teste de duplicados, grava todos com segurança
             rows.forEach(row => {
                 const name = row.querySelector('.mat-name').value.trim();
                 const unit = row.querySelector('.mat-unit').value.trim();
@@ -1031,7 +1017,6 @@
                         balance: balance
                     };
                     
-                    // Envia cada material para o banco
                     promessas.push(db.collection("materials").add(materialData));
                     cadastrados++;
                 }
@@ -1055,13 +1040,11 @@
 
             let html = '';
             state.materials.forEach(mat => {
-                // Alerta visual de estoque crítico na gestão de saldos (< 5 unidades)
                 const isLowStock = mat.balance < 5;
                 const codeClass = isLowStock 
                     ? "text-red-600 bg-red-50 border border-red-100 px-1.5 py-0.5 rounded font-extrabold" 
                     : "text-blue-900";
 
-                // Modificação: Altera a cor de fundo da linha inteira e insere badge de notificação no painel admin
                 const rowClass = isLowStock ? "bg-red-50 hover:bg-red-100" : "hover:bg-gray-50";
                 const notificationHtml = isLowStock ? `<span class="bg-red-200 text-red-800 text-[10px] font-bold px-1.5 py-0.5 rounded ml-2 inline-flex items-center gap-1 animate-pulse">⚠️ BAIXO ESTOQUE</span>` : '';
 
@@ -1132,7 +1115,7 @@
                             </div>
                             <div class="flex gap-2">
                                 <button onclick="abrirModalPedido('${req.id}')" class="bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs px-3.5 py-1.5 rounded-lg transition-all flex items-center gap-1.5 shadow-sm">
-                                    👀 Ver Pedido
+                                    👀 Ver / Editar Pedido
                                 </button>
                                 <button onclick="imprimirOrdemFornecimento('${req.id}')" class="border border-blue-200 hover:bg-blue-50 text-blue-700 font-semibold text-xs px-3 py-1.5 rounded-lg transition-all flex items-center gap-1.5">
                                     📜 Imprimir Ordem de Fornecimento
@@ -1149,7 +1132,7 @@
                             <button onclick="recusarSolicitacao('${req.id}')" class="bg-red-50 hover:bg-red-100 text-red-700 font-semibold text-sm px-4 py-2 rounded-lg transition-all">
                                 Recusar Solicitação
                             </button>
-                            <button onclick="aprovarSolicitacao('${req.id}')" class="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-sm px-5 py-2 rounded-lg shadow-sm transition-all">
+                            <button onclick="aprovarSolicitacaoDoCard('${req.id}')" class="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-sm px-5 py-2 rounded-lg shadow-sm transition-all">
                                 Liberar & Deduzir do Saldo
                             </button>
                         </div>
@@ -1159,136 +1142,373 @@
             container.innerHTML = html;
         }
 
-        // Permite ao Administrador diminuir/ajustar a quantidade da solicitação em tempo real por dentro do modal
-        function atualizarQuantidadeSolicitadaModal(requestId, materialId, novaQtd) {
-            const valor = parseInt(novaQtd);
-            if (isNaN(valor) || valor < 0) {
-                alert("Por favor, digite uma quantidade válida (maior ou igual a 0).");
+        // --- MANIPULAÇÃO LOCAL DA CÓPIA DO PEDIDO DENTRO DO MODAL ---
+
+        function atualizarQuantidadeSolicitadaModal(materialId, novaQtd) {
+            if (!pedidoEmEdicao) return;
+            
+            // Trava caso o status não seja pendente
+            if (pedidoEmEdicao.status !== 'pending') {
+                alert("Ação bloqueada! Este pedido já foi liberado ou recusado.");
+                renderConteudoModal();
                 return;
             }
 
-            const req = state.requests.find(r => r.id === requestId);
-            if (!req) return;
+            const valor = parseInt(novaQtd);
+            if (isNaN(valor) || valor < 0) return;
 
-            // Mapeia e atualiza o item com a nova quantidade digitada
-            const itemsAtualizados = req.items.map(item => {
-                if (item.materialId === materialId) {
-                    return { ...item, qtyRequested: valor };
+            const item = pedidoEmEdicao.items.find(i => i.materialId === materialId);
+            if (item) {
+                if (item.qtyOriginal === undefined) {
+                    item.qtyOriginal = item.qtyRequested;
                 }
-                return item;
-            });
+                item.qtyRequested = valor;
+            }
+            renderConteudoModal();
+        }
 
-            // box diretamente no banco Firestore (o snapshot do Firebase atualizará o modal automaticamente)
-            db.collection("requests").doc(requestId).update({
-                items: itemsAtualizados
-            }).catch(err => alert("Erro ao atualizar quantidade no banco de dados: " + err.message));
+        function removerItemSolicitacaoModal(materialId) {
+            if (!pedidoEmEdicao) return;
+
+            // Trava caso o status não seja pendente
+            if (pedidoEmEdicao.status !== 'pending') {
+                alert("Ação bloqueada! Este pedido já foi liberado ou recusado.");
+                return;
+            }
+
+            if (!confirm("Tem certeza que deseja remover este item da solicitação?")) return;
+
+            const itemRemovido = pedidoEmEdicao.items.find(i => i.materialId === materialId);
+            if (itemRemovido) {
+                if (itemRemovido.qtyOriginal === undefined) {
+                    itemRemovido.qtyOriginal = itemRemovido.qtyRequested;
+                }
+                pedidoEmEdicao.removedItems = pedidoEmEdicao.removedItems || [];
+                pedidoEmEdicao.removedItems.push(itemRemovido);
+                pedidoEmEdicao.items = pedidoEmEdicao.items.filter(i => i.materialId !== materialId);
+            }
+            renderConteudoModal();
+        }
+
+        function adicionarItemAoPedidoModal() {
+            if (!pedidoEmEdicao) return;
+            if (pedidoEmEdicao.status !== 'pending') {
+                alert("Ação bloqueada! Este pedido já foi liberado ou recusado.");
+                return;
+            }
+
+            const selectEl = document.getElementById('modal-select-add-material');
+            const qtyEl = document.getElementById('modal-input-add-qty');
+
+            if (!selectEl || !qtyEl) return;
+
+            const materialId = selectEl.value;
+            const qty = parseInt(qtyEl.value) || 1;
+
+            if (!materialId) {
+                alert("Selecione um material para adicionar.");
+                return;
+            }
+
+            const mat = state.materials.find(m => m.id === materialId);
+            if (!mat) return;
+
+            const itemExistente = pedidoEmEdicao.items.find(i => i.materialId === materialId);
+            if (itemExistente) {
+                itemExistente.qtyRequested += qty;
+            } else {
+                pedidoEmEdicao.items.push({
+                    materialId: mat.id,
+                    code: mat.code || 'S/C',
+                    name: mat.name,
+                    unit: mat.unit,
+                    qtyRequested: qty,
+                    qtyOriginal: 0
+                });
+            }
+
+            renderConteudoModal();
+        }
+
+        function salvarJustificativaModal(texto) {
+            if (!pedidoEmEdicao) return;
+            pedidoEmEdicao.justification = texto;
+        }
+
+        function salvarJustificativaAlteracaoModal(texto) {
+            if (!pedidoEmEdicao) return;
+            pedidoEmEdicao.justificativaAlteracao = texto;
         }
 
         function abrirModalPedido(id) {
+            const reqOriginal = state.requests.find(r => r.id === id);
+            if (!reqOriginal) return;
+
             idPedidoAberto = id;
-            const req = state.requests.find(r => r.id === id);
-            if (!req) return;
+            pedidoEmEdicao = structuredClone(reqOriginal);
+
+            renderConteudoModal();
 
             const modal = document.getElementById('modal-ver-pedido');
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+        }
+
+        function fecharModalPedido() {
+            const modal = document.getElementById('modal-ver-pedido');
+            modal.classList.add('hidden');
+            modal.classList.remove('flex');
+            
+            idPedidoAberto = null;
+            pedidoEmEdicao = null;
+        }
+
+        // ================= FUNÇÃO PARA SALVAR ALTERAÇÃO DO USUÁRIO =================
+        async function salvarEdicaoPedidoModal(id) {
+            if (!pedidoEmEdicao) return;
+
+            if (pedidoEmEdicao.items.length === 0) {
+                alert("O pedido deve conter pelo menos um item. Se não precisa mais dos materiais, contate o administrador.");
+                return;
+            }
+
+            if (!pedidoEmEdicao.justification || !pedidoEmEdicao.justification.trim()) {
+                alert("A justificativa do pedido não pode ficar vazia.");
+                return;
+            }
+
+            try {
+                // 🔒 VALIDAÇÃO DE SEGURANÇA EM TEMPO REAL NO FIRESTORE
+                const docRef = db.collection("requests").doc(id);
+                const docSnap = await docRef.get();
+
+                if (!docSnap.exists) {
+                    alert("Pedido não encontrado no banco de dados.");
+                    return;
+                }
+
+                const statusAtualBanco = docSnap.data().status;
+
+                // Bloqueia qualquer salvamento se o status mudou de 'pending'
+                if (statusAtualBanco !== 'pending') {
+                    const statusNome = statusAtualBanco === 'approved' ? 'LIBERADO' : 'RECUSADO';
+                    alert(`Ação bloqueada! O pedido já foi ${statusNome} pelo almoxarifado e não pode mais ser alterado.`);
+                    fecharModalPedido();
+                    return;
+                }
+
+                // Salva alterações
+                await docRef.update({
+                    items: pedidoEmEdicao.items,
+                    removedItems: pedidoEmEdicao.removedItems || [],
+                    justification: pedidoEmEdicao.justification.trim(),
+                    justificativaAlteracao: pedidoEmEdicao.justificativaAlteracao || ''
+                });
+
+                alert("Alterações salvas com sucesso!");
+                fecharModalPedido();
+            } catch (err) {
+                alert("Erro ao salvar alterações: " + err.message);
+            }
+        }
+
+        // ================= RENDERIZAÇÃO OTIMIZADA DO MODAL (TELA ÚNICA) =================
+        function renderConteudoModal() {
+            if (!pedidoEmEdicao) return;
+
+            const req = pedidoEmEdicao;
             const corpo = document.getElementById('modal-pedido-corpo');
             const botoes = document.getElementById('modal-pedido-botoes');
 
+            // Regra: Pode editar se o pedido for 'pending' E (for Admin OU o próprio Solicitante)
+            const eEditavel = req.status === 'pending' && state.currentUser && (state.currentUser.role === 'admin' || req.userId === state.currentUser.id);
+
+            const temItemReduzido = req.items.some(item => {
+                const orig = item.qtyOriginal !== undefined ? item.qtyOriginal : item.qtyRequested;
+                return item.qtyRequested < orig;
+            });
+
+            const temItemRemovido = req.removedItems && req.removedItems.length > 0;
+            const precisaJustificativaAdmin = temItemReduzido || temItemRemovido;
+
             let itemsHtml = '';
             
-            // Se o pedido for pendente, o admin pode alterar as quantidades por dentro do modal
-            if (req.status === 'pending') {
+            if (eEditavel) {
                 req.items.forEach(item => {
                     const originalMaterial = state.materials.find(m => m.id === item.materialId);
                     const saldoAtual = originalMaterial ? originalMaterial.balance : 0;
+                    const origQty = item.qtyOriginal !== undefined ? item.qtyOriginal : item.qtyRequested;
                     
                     const faltaEstoque = item.qtyRequested > saldoAtual;
                     const stockBadge = faltaEstoque 
-                        ? `<span class="text-red-600 font-bold text-[11px] bg-red-50 px-2 py-1 rounded">⚠️ Estoque Insuficiente (Saldo: ${saldoAtual})</span>`
-                        : `<span class="text-emerald-700 text-[11px] bg-emerald-50 px-2 py-1 rounded">✓ Disponível (Saldo: ${saldoAtual})</span>`;
+                        ? `<span class="text-red-600 font-bold text-[10px] bg-red-50 px-1.5 py-0.5 rounded">⚠️ Insuficiente (${saldoAtual})</span>`
+                        : `<span class="text-emerald-700 text-[10px] bg-emerald-50 px-1.5 py-0.5 rounded">✓ Disp. (${saldoAtual})</span>`;
 
-                    // Alerta visual de estoque crítico no modal (< 5 unidades)
                     const isLowStock = saldoAtual < 5;
                     const codeClass = isLowStock 
-                        ? "text-red-600 bg-red-50 border border-red-200 px-1.5 py-0.5 rounded font-extrabold" 
+                        ? "text-red-600 bg-red-50 border border-red-200 px-1 py-0.5 rounded font-extrabold" 
                         : "text-slate-500 font-semibold";
 
+                    const foiReduzido = item.qtyRequested < origQty;
+
                     itemsHtml += `
-                        <tr class="border-b border-gray-100 text-xs">
-                            <td class="py-2.5 px-1 text-gray-800">
-                                <span class="font-mono text-[10px] ${codeClass} mr-2">[${item.code || 'S/C'}]</span>
+                        <tr class="border-b border-gray-100 text-xs hover:bg-gray-50">
+                            <td class="py-1.5 px-2 text-gray-800">
+                                <span class="font-mono text-[10px] ${codeClass} mr-1">[${item.code || 'S/C'}]</span>
                                 ${item.name}
+                                ${foiReduzido ? `<span class="inline-block text-[10px] text-amber-600 font-bold ml-1">(Orig: ${origQty})</span>` : ''}
                             </td>
-                            <td class="py-2.5 px-1 text-center text-gray-500">${item.unit}</td>
-                            <td class="py-2.5 px-1 text-center">
-                                <input type="number" min="0" value="${item.qtyRequested}" 
-                                    onchange="atualizarQuantidadeSolicitadaModal('${req.id}', '${item.materialId}', this.value)" 
-                                    class="w-16 text-center bg-white border border-gray-300 rounded p-1 text-xs font-bold focus:ring-1 focus:ring-blue-500 outline-none">
+                            <td class="py-1.5 px-2 text-center text-gray-500">${item.unit}</td>
+                            <td class="py-1.5 px-2 text-center">
+                                <input type="number" min="1" value="${item.qtyRequested}" 
+                                    onchange="atualizarQuantidadeSolicitadaModal('${item.materialId}', this.value)" 
+                                    class="w-14 text-center bg-white border border-gray-300 rounded p-1 text-xs font-bold focus:ring-1 focus:ring-blue-500 outline-none">
                             </td>
-                            <td class="py-2.5 px-1 text-right">${stockBadge}</td>
+                            <td class="py-1.5 px-2 text-right">
+                                <div class="flex items-center justify-end gap-1.5">
+                                    ${stockBadge}
+                                    <button onclick="removerItemSolicitacaoModal('${item.materialId}')" class="text-red-500 hover:text-red-700 hover:bg-red-50 p-1 rounded transition-all" title="Remover item">
+                                        🗑️
+                                    </button>
+                                </div>
+                            </td>
                         </tr>
                     `;
                 });
             } else {
-                // Se já estiver processado, exibe como texto informativo simples
                 req.items.forEach(item => {
                     const originalMaterial = state.materials.find(m => m.id === item.materialId);
                     const saldoAtual = originalMaterial ? originalMaterial.balance : 0;
+                    const origQty = item.qtyOriginal !== undefined ? item.qtyOriginal : item.qtyRequested;
                     
-                    // Alerta visual de estoque crítico no histórico do modal (< 5 unidades)
-                    const isLowStock = saldoAtual < 5;
+                    const isLowStock = saldoAtual < 5 && state.currentUser.role === 'admin';
                     const codeClass = isLowStock 
-                        ? "text-red-600 bg-red-50 border border-red-200 px-1.5 py-0.5 rounded font-extrabold" 
+                        ? "text-red-600 bg-red-50 border border-red-200 px-1 py-0.5 rounded font-extrabold" 
                         : "text-slate-500 font-semibold";
 
                     itemsHtml += `
                         <tr class="border-b border-gray-100 text-xs">
-                            <td class="py-2.5 px-1 text-gray-800">
-                                <span class="font-mono text-[10px] ${codeClass} mr-2">[${item.code || 'S/C'}]</span>
+                            <td class="py-1.5 px-2 text-gray-800">
+                                <span class="font-mono text-[10px] ${codeClass} mr-1">[${item.code || 'S/C'}]</span>
                                 ${item.name}
+                                ${item.qtyRequested < origQty ? `<span class="inline-block text-[10px] text-amber-600 font-bold ml-1">(Reduzido)</span>` : ''}
                             </td>
-                            <td class="py-2.5 px-1 text-center text-gray-500">${item.unit}</td>
-                            <td class="py-2.5 px-1 text-center font-bold text-gray-950">${item.qtyRequested}</td>
-                            <td class="py-2.5 px-1 text-right text-gray-400 font-semibold">Processado</td>
+                            <td class="py-1.5 px-2 text-center text-gray-500">${item.unit}</td>
+                            <td class="py-1.5 px-2 text-center font-bold text-gray-950">${item.qtyRequested}</td>
+                            <td class="py-1.5 px-2 text-right text-gray-400 font-semibold">
+                                ${req.status === 'pending' ? 'Aguardando' : 'Processado'}
+                            </td>
                         </tr>
                     `;
                 });
             }
 
+            // BARRA DE ADIÇÃO DE MATERIAL INTEGRADAS DE FORMA COMPACTA
+            let addMaterialSectionHtml = '';
+            if (eEditavel) {
+                const disponiveis = state.materials.filter(m => !req.items.some(i => i.materialId === m.id));
+                let optionsHtml = '<option value="">-- Selecione um material --</option>';
+                disponiveis.forEach(m => {
+                    optionsHtml += `<option value="${m.id}">${m.name} (${m.unit}) - Saldo: ${m.balance}</option>`;
+                });
+
+                addMaterialSectionHtml = `
+                    <div class="flex flex-wrap items-center gap-2 bg-blue-50/70 p-2 rounded-lg border border-blue-200">
+                        <span class="text-xs font-bold text-blue-900 whitespace-nowrap">➕ Adicionar Item:</span>
+                        <select id="modal-select-add-material" class="flex-grow bg-white border border-gray-300 rounded p-1.5 text-xs focus:ring-1 focus:ring-blue-500 outline-none min-w-[180px]">
+                            ${optionsHtml}
+                        </select>
+                        <input type="number" id="modal-input-add-qty" min="1" value="1" placeholder="Qtd" class="w-16 text-center bg-white border border-gray-300 rounded p-1.5 text-xs font-bold focus:ring-1 focus:ring-blue-500 outline-none">
+                        <button type="button" onclick="adicionarItemAoPedidoModal()" class="bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs px-3 py-1.5 rounded transition-all shadow-sm flex items-center gap-1">
+                            ➕ Incluir
+                        </button>
+                    </div>
+                `;
+            }
+
+            let removedItemsBlock = '';
+            if (temItemRemovido) {
+                removedItemsBlock = `
+                    <div class="bg-red-50 border border-red-200 rounded-lg p-2 text-xs">
+                        <span class="block text-[11px] font-bold text-red-800 uppercase mb-0.5">🗑️ Itens Removidos</span>
+                        <p class="text-red-700 text-[11px]">
+                            ${req.removedItems.map(ri => `<strong>${ri.name}</strong> (${ri.unit})`).join(', ')}
+                        </p>
+                    </div>
+                `;
+            }
+
+            let justificativaAlteracaoBlock = '';
+            if (precisaJustificativaAdmin) {
+                if (req.status === 'pending' && state.currentUser && state.currentUser.role === 'admin') {
+                    justificativaAlteracaoBlock = `
+                        <div class="bg-amber-50 border-l-4 border-amber-500 p-2 rounded-r-lg text-xs">
+                            <label class="block font-bold text-amber-900 uppercase text-[11px] mb-1">
+                                ⚠️ Motivo da Alteração/Remoção pelo Almoxarifado <span class="text-red-600">*</span>
+                            </label>
+                            <input 
+                                type="text"
+                                value="${req.justificativaAlteracao || ''}"
+                                onchange="salvarJustificativaAlteracaoModal(this.value)" 
+                                placeholder="Ex: Item em falta no estoque / Ajustado conforme cota do setor..." 
+                                class="w-full bg-white border border-amber-300 rounded p-1.5 text-xs focus:ring-1 focus:ring-amber-500 outline-none text-gray-800">
+                        </div>
+                    `;
+                } else if (req.justificativaAlteracao) {
+                    justificativaAlteracaoBlock = `
+                        <div class="bg-amber-50 border-l-4 border-amber-500 p-2 rounded-r-lg text-xs">
+                            <span class="block font-bold text-amber-900 uppercase text-[10px]">⚠️ Observação do Almoxarifado</span>
+                            <p class="text-gray-700 italic text-[11px]">"${req.justificativaAlteracao}"</p>
+                        </div>
+                    `;
+                }
+            }
+
             const statusBadge = req.status === 'pending' 
-                ? '<span class="bg-amber-100 text-amber-800 text-[11px] px-2.5 py-1 rounded-full font-semibold uppercase">Pendente</span>'
+                ? '<span class="bg-amber-100 text-amber-800 text-[10px] px-2 py-0.5 rounded-full font-semibold uppercase">Pendente</span>'
                 : req.status === 'approved'
-                    ? '<span class="bg-emerald-100 text-emerald-800 text-[11px] px-2.5 py-1 rounded-full font-semibold uppercase">Aprovado</span>'
-                    : '<span class="bg-red-100 text-red-800 text-[11px] px-2.5 py-1 rounded-full font-semibold uppercase">Recusado</span>';
+                    ? '<span class="bg-emerald-100 text-emerald-800 text-[10px] px-2 py-0.5 rounded-full font-semibold uppercase">Liberado</span>'
+                    : '<span class="bg-red-100 text-red-800 text-[10px] px-2 py-0.5 rounded-full font-semibold uppercase">Recusado</span>';
 
             corpo.innerHTML = `
-                <div class="grid grid-cols-2 gap-4 bg-gray-50 p-4 rounded-xl border border-gray-200 text-xs">
-                    <div>
-                        <p class="text-gray-500 font-semibold">Solicitante:</p>
-                        <p class="font-extrabold text-gray-950 text-sm">${req.userName}</p>
-                        <p class="text-gray-600">${req.userSector}</p>
+                <!-- PAINEL SUPERIOR COMPACTO (GRILLA 2 COLUNAS) -->
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div class="bg-gray-50 p-2.5 rounded-xl border border-gray-200 text-xs flex justify-between items-center">
+                        <div>
+                            <p class="text-gray-500 font-semibold text-[11px]">Solicitante:</p>
+                            <p class="font-extrabold text-gray-950 text-xs leading-tight">${req.userName}</p>
+                            <p class="text-gray-600 text-[11px]">${req.userSector} • <span class="text-gray-400">${req.date}</span></p>
+                        </div>
+                        <div>${statusBadge}</div>
                     </div>
-                    <div class="text-right">
-                        <p class="text-gray-500 font-semibold">Data:</p>
-                        <p class="font-semibold text-gray-950">${req.date}</p>
-                        <div class="mt-1.5">${statusBadge}</div>
+
+                    <div class="bg-blue-50/60 border border-blue-200 rounded-xl p-2.5 text-xs">
+                        <span class="block text-[11px] font-bold text-blue-900 uppercase mb-1">Justificativa do Pedido</span>
+                        ${eEditavel ? `
+                            <textarea onchange="salvarJustificativaModal(this.value)" placeholder="Edite a justificativa..." rows="1" class="w-full bg-white border border-blue-300 rounded p-1.5 text-xs focus:ring-1 focus:ring-blue-500 outline-none text-gray-800 resize-none">${req.justification || ''}</textarea>
+                        ` : `
+                            <p class="text-gray-700 italic text-[11px] truncate" title="${req.justification || 'Não informada'}">"${req.justification || 'Não informada'}"</p>
+                        `}
                     </div>
                 </div>
 
-                <div class="bg-amber-50 border border-amber-200 rounded-lg p-3 text-xs">
-                    <span class="block text-[11px] font-bold text-amber-800 uppercase mb-1">Justificativa de Uso</span>
-                    <p class="text-gray-700 italic">"${req.justification || 'Não informada'}"</p>
-                </div>
+                ${removedItemsBlock}
+                ${justificativaAlteracaoBlock}
 
+                <!-- BARRA DE INCLUSÃO DE MATERIAL -->
+                ${addMaterialSectionHtml}
+
+                <!-- TABELA DE MATERIAIS COM ROLAGEM DEDICADA -->
                 <div>
-                    <h4 class="text-xs font-bold text-gray-700 uppercase mb-2">Materiais do Pedido</h4>
-                    <div class="overflow-x-auto">
+                    <h4 class="text-xs font-bold text-gray-700 uppercase mb-1">Materiais Solicitados (${req.items.length})</h4>
+                    <div class="overflow-y-auto max-h-48 border border-gray-200 rounded-lg">
                         <table class="w-full text-left border-collapse">
-                            <thead>
-                                <tr class="text-[11px] text-gray-400 uppercase border-b border-gray-200 pb-2">
-                                    <th class="pb-2 font-semibold">Material</th>
-                                    <th class="pb-2 text-center font-semibold">Unidade</th>
-                                    <th class="pb-2 text-center font-semibold">Qtd. Solicitada</th>
-                                    <th class="pb-2 text-right font-semibold">Situação</th>
+                            <thead class="bg-gray-100 sticky top-0 z-10">
+                                <tr class="text-[10px] text-gray-500 uppercase border-b border-gray-200">
+                                    <th class="py-1.5 px-2 font-bold">Material</th>
+                                    <th class="py-1.5 px-2 text-center font-bold">Unidade</th>
+                                    <th class="py-1.5 px-2 text-center font-bold">Qtd. Solicitada</th>
+                                    <th class="py-1.5 px-2 text-right font-bold">Situação / Ação</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -1301,42 +1521,67 @@
 
             let botoesHtml = '';
             
-            // Renderiza ações de pendência por dentro do modal se necessário
             if (req.status === 'pending') {
+                if (eEditavel) {
+                    botoesHtml += `
+                        <button onclick="salvarEdicaoPedidoModal('${req.id}')" class="bg-amber-600 hover:bg-amber-700 text-white font-semibold text-xs px-3.5 py-1.5 rounded-lg shadow-sm transition-all flex items-center gap-1">
+                            💾 Salvar
+                        </button>
+                    `;
+                }
+
+                if (state.currentUser && state.currentUser.role === 'admin') {
+                    botoesHtml += `
+                        <button onclick="recusarSolicitacaoModal('${req.id}')" class="bg-red-50 hover:bg-red-100 text-red-700 font-semibold text-xs px-3.5 py-1.5 rounded-lg transition-all">
+                            Recusar
+                        </button>
+                        <button onclick="aprovarSolicitacaoModal('${req.id}')" class="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs px-4 py-1.5 rounded-lg shadow-sm transition-all">
+                            Liberar & Deduzir
+                        </button>
+                    `;
+                }
+            } else {
+                // 🔒 BLOQUEIO VISUAL CASO STATUS SEJA LIBERADO OU RECUSADO
+                const statusTxt = req.status === 'approved' ? 'Liberado' : 'Recusado';
                 botoesHtml += `
-                    <button onclick="recusarSolicitacaoModal('${req.id}')" class="bg-red-50 hover:bg-red-100 text-red-700 font-semibold text-xs px-4 py-2 rounded-lg transition-all">
-                        Recusar Solicitação
-                    </button>
-                    <button onclick="aprovarSolicitacaoModal('${req.id}')" class="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs px-4 py-2 rounded-lg shadow-sm transition-all">
-                        Liberar & Deduzir
-                    </button>
+                    <span class="inline-flex items-center gap-1 bg-gray-100 text-gray-500 text-xs px-3 py-1.5 rounded-lg font-semibold border border-gray-200" title="Pedidos processados não podem ser alterados">
+                        🔒 Edição Bloqueada (${statusTxt})
+                    </span>
                 `;
             }
 
-            // Ações universais
             botoesHtml += `
-                <button onclick="imprimirPedido('${req.id}')" class="bg-blue-700 hover:bg-blue-800 text-white font-semibold text-xs px-4 py-2 rounded-lg transition-all flex items-center gap-1.5">
-                    🖨️ Imprimir Pedido
+                <button onclick="imprimirPedido('${req.id}')" class="bg-blue-700 hover:bg-blue-800 text-white font-semibold text-xs px-3.5 py-1.5 rounded-lg transition-all flex items-center gap-1">
+                    🖨️ Imprimir
                 </button>
-                ${req.status === 'approved' ? `
-                    <button onclick="imprimirOrdemFornecimento('${req.id}')" class="bg-emerald-700 hover:bg-emerald-800 text-white font-semibold text-xs px-4 py-2 rounded-lg transition-all flex items-center gap-1.5">
+                ${(req.status === 'approved' && state.currentUser && state.currentUser.role === 'admin') ? `
+                    <button onclick="imprimirOrdemFornecimento('${req.id}')" class="bg-emerald-700 hover:bg-emerald-800 text-white font-semibold text-xs px-3.5 py-1.5 rounded-lg transition-all flex items-center gap-1">
                         📜 Ordem Fornec.
                     </button>
                 ` : ''}
-                <button onclick="fecharModalPedido()" class="bg-gray-200 hover:bg-gray-300 text-gray-700 font-semibold text-xs px-4 py-2 rounded-lg transition-all">
+                <button onclick="fecharModalPedido()" class="bg-gray-200 hover:bg-gray-300 text-gray-700 font-semibold text-xs px-3.5 py-1.5 rounded-lg transition-all">
                     Fechar
                 </button>
             `;
 
             botoes.innerHTML = botoesHtml;
-
-            modal.classList.remove('hidden');
-            modal.classList.add('flex');
         }
 
-        function aprovarSolicitacao(id) {
-            const req = state.requests.find(r => r.id === id);
-            if (!req) return;
+        function aprovarSolicitacaoModal(id) {
+            if (!pedidoEmEdicao) return;
+
+            const req = pedidoEmEdicao;
+
+            const temItemReduzido = req.items.some(item => {
+                const orig = item.qtyOriginal !== undefined ? item.qtyOriginal : item.qtyRequested;
+                return item.qtyRequested < orig;
+            });
+            const temItemRemovido = req.removedItems && req.removedItems.length > 0;
+
+            if ((temItemReduzido || temItemRemovido) && (!req.justificativaAlteracao || !req.justificativaAlteracao.trim())) {
+                alert("Atenção: Houve remoção ou diminuição na quantidade dos itens. Preencha o campo de justificativa da alteração antes de liberar o pedido.");
+                return;
+            }
             
             let erroEstoque = [];
             req.items.forEach(item => {
@@ -1352,7 +1597,6 @@
                 }
             }
 
-            // Atualiza saldos no Firebase
             req.items.forEach(item => {
                 const originalMaterial = state.materials.find(m => m.id === item.materialId);
                 if (originalMaterial) {
@@ -1361,7 +1605,48 @@
                 }
             });
 
-            //  Atualiza status da solicitação
+            db.collection("requests").doc(id).update({
+                items: req.items,
+                removedItems: req.removedItems || [],
+                justification: req.justification || '',
+                justificativaAlteracao: req.justificativaAlteracao || '',
+                status: 'approved',
+                dateProcessed: new Date().toLocaleString('pt-BR'),
+                approvedBy: state.currentUser ? state.currentUser.name : 'Administrador'
+            }).then(() => {
+                alert("Solicitação autorizada e baixada do estoque com sucesso!");
+                fecharModalPedido();
+            }).catch(err => {
+                alert("Erro ao salvar no banco de dados: " + err.message);
+            });
+        }
+
+        function aprovarSolicitacaoDoCard(id) {
+            const req = state.requests.find(r => r.id === id);
+            if (!req) return;
+
+            let erroEstoque = [];
+            req.items.forEach(item => {
+                const originalMaterial = state.materials.find(m => m.id === item.materialId);
+                if (!originalMaterial || originalMaterial.balance < item.qtyRequested) {
+                    erroEstoque.push(item.name);
+                }
+            });
+
+            if (erroEstoque.length > 0) {
+                if (!confirm(`Atenção: Os seguintes itens não possuem saldo suficiente no estoque:\n- ${erroEstoque.join('\n- ')}\n\nDeseja forçar a liberação mesmo assim (o estoque poderá ficar negativo)?`)) {
+                    return;
+                }
+            }
+
+            req.items.forEach(item => {
+                const originalMaterial = state.materials.find(m => m.id === item.materialId);
+                if (originalMaterial) {
+                    const novoSaldo = originalMaterial.balance - item.qtyRequested;
+                    db.collection("materials").doc(item.materialId).update({ balance: novoSaldo });
+                }
+            });
+
             db.collection("requests").doc(id).update({
                 status: 'approved',
                 dateProcessed: new Date().toLocaleString('pt-BR'),
@@ -1383,24 +1668,47 @@
             }
         }
 
-        // ================= FUNÇÕES: ABA HISTÓRICO (ADMIN) =================
+        function recusarSolicitacaoModal(id) {
+            recusarSolicitacao(id);
+            fecharModalPedido();
+        }
+
+        // ================= FUNÇÕES: ABA HISTÓRICO =================
 
         function renderHistorico() {
             const tbody = document.getElementById('historico-tbody');
-            const processados = state.requests.filter(r => r.status !== 'pending' && r.ativo !== false);
+            const btnLimpar = document.getElementById('btn-limpar-historico');
+            const tituloHistorico = document.getElementById('historico-titulo');
+            const isAdmin = state.currentUser && state.currentUser.role === 'admin';
 
-            if (processados.length === 0) {
-                tbody.innerHTML = `<tr><td colspan="6" class="py-8 text-center text-gray-400">Nenhuma solicitação processada no histórico.</td></tr>`;
+            if (btnLimpar) {
+                btnLimpar.style.display = isAdmin ? 'inline-block' : 'none';
+            }
+
+            let pedidosExibicao = [];
+
+            if (isAdmin) {
+                tituloHistorico.innerText = "Histórico Global de Pedidos Processados";
+                pedidosExibicao = state.requests.filter(r => r.status !== 'pending' && r.ativo !== false);
+            } else {
+                tituloHistorico.innerText = "Meus Pedidos Realizados";
+                pedidosExibicao = state.requests.filter(r => r.userId === state.currentUser.id && r.ativo !== false);
+            }
+
+            if (pedidosExibicao.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="6" class="py-8 text-center text-gray-400">Nenhum pedido encontrado no histórico.</td></tr>`;
                 return;
             }
 
             let html = '';
-            processados.forEach(req => {
+            pedidosExibicao.forEach(req => {
                 let statusBadge = '';
                 if (req.status === 'approved') {
-                    statusBadge = '<span class="bg-emerald-100 text-emerald-800 text-xs px-2.5 py-1 rounded-full font-semibold">Aprovado</span>';
-                } else {
+                    statusBadge = '<span class="bg-emerald-100 text-emerald-800 text-xs px-2.5 py-1 rounded-full font-semibold">Liberado</span>';
+                } else if (req.status === 'rejected') {
                     statusBadge = '<span class="bg-red-100 text-red-800 text-xs px-2.5 py-1 rounded-full font-semibold">Recusado</span>';
+                } else {
+                    statusBadge = '<span class="bg-amber-100 text-amber-800 text-xs px-2.5 py-1 rounded-full font-semibold animate-pulse">Pendente</span>';
                 }
 
                 let detalheJustificativa = `
@@ -1408,6 +1716,31 @@
                         "${req.justification || 'Não detalhado'}"
                     </div>
                 `;
+
+                if (req.justificativaAlteracao) {
+                    detalheJustificativa += `
+                        <div class="mt-1 text-[11px] text-amber-700 bg-amber-50 p-1.5 rounded border border-amber-200">
+                            <strong>Obs. Alteração:</strong> ${req.justificativaAlteracao}
+                        </div>
+                    `;
+                }
+
+                let acoes = '';
+                
+                if (req.status === 'pending') {
+                    acoes = `<button onclick="abrirModalPedido('${req.id}')" class="text-amber-600 hover:underline text-xs font-bold">✏️ Editar Pedido</button>`;
+                } else {
+                    acoes = `<button onclick="abrirModalPedido('${req.id}')" class="text-blue-600 hover:underline text-xs font-semibold">Ver Detalhes</button>`;
+                }
+
+                if (isAdmin) {
+                    if (req.status === 'approved') {
+                        acoes += ` | <button onclick="imprimirOrdemFornecimento('${req.id}')" class="text-emerald-700 hover:underline text-xs">Ordem Fornec.</button>`;
+                    }
+                    acoes += ` | <button onclick="excluirSolicitacaoLogica('${req.id}')" class="text-red-500 hover:underline text-xs">Excluir</button>`;
+                } else {
+                    acoes += ` | <button onclick="imprimirPedido('${req.id}')" class="text-gray-600 hover:underline text-xs">Imprimir</button>`;
+                }
 
                 html += `
                     <tr class="hover:bg-gray-50 text-xs sm:text-sm">
@@ -1419,9 +1752,7 @@
                         </td>
                         <td class="py-3 px-4 text-center">${statusBadge}</td>
                         <td class="py-3 px-4 text-center space-x-1 whitespace-nowrap">
-                            <button onclick="abrirModalPedido('${req.id}')" class="text-blue-600 hover:underline text-xs font-semibold">Ver Pedido</button>
-                            ${req.status === 'approved' ? `| <button onclick="imprimirOrdemFornecimento('${req.id}')" class="text-emerald-700 hover:underline text-xs">Ordem Fornec.</button>` : ''}
-                            | <button onclick="excluirSolicitacaoLogica('${req.id}')" class="text-red-500 hover:underline text-xs">Excluir</button>
+                            ${acoes}
                         </td>
                     </tr>
                 `;
@@ -1430,7 +1761,7 @@
         }
 
         function limparHistorico() {
-            if (confirm("Atenção! Isso ocultará todo o histórico de solicitudes processadas do painel. Confirmar?")) {
+            if (confirm("Atenção! Isso ocultará todo o histórico de solicitações processadas do painel. Confirmar?")) {
                 const batch = db.batch();
                 state.requests.forEach(r => {
                     if (r.status !== 'pending' && r.ativo !== false) {
@@ -1452,40 +1783,18 @@
             }
         }
 
-        // ================= CONTROLE DO MODAL DE VISUALIZAÇÃO DE PEDIDOS (VER PEDIDO) =================
-
-        // Função para fechar o modal
-        function fecharModalPedido() {
-            const modal = document.getElementById('modal-ver-pedido');
-            modal.classList.add('hidden');
-            modal.classList.remove('flex');
-            idPedidoAberto = null; // Libera o ID aberto
-        }
-
-        function aprovarSolicitacaoModal(id) {
-            aprovarSolicitacao(id);
-            fecharModalPedido();
-        }
-
-        function recusarSolicitacaoModal(id) {
-            recusarSolicitacao(id);
-            fecharModalPedido();
-        }
-
         // ================= SISTEMA DE IMPRESSÕES E RELATÓRIOS =================
 
         function runPrint(html) {
             const printArea = document.getElementById('print-area');
             printArea.innerHTML = html;
             
-            // Ouvinte de evento assíncrono para apagar o conteúdo APENAS quando o processo de impressão for concluído ou cancelado
             const limparDepoisDeImprimir = () => {
                 printArea.innerHTML = '';
                 window.removeEventListener('afterprint', limparDepoisDeImprimir);
             };
             window.addEventListener('afterprint', limparDepoisDeImprimir);
 
-            // Pequeno delay de 100ms para garantir renderização do DOM antes da chamada do driver de impressão
             setTimeout(() => {
                 window.print();
             }, 100);
@@ -1559,7 +1868,6 @@
 
             const template = `
                 <div style="font-family: system-ui, -apple-system, sans-serif; padding: 10px 20px; max-width: 800px; margin: auto;">
-                    <!-- Cabeçalho Organizado -->
                     <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 3px solid #1e3a8a; padding-bottom: 15px; margin-bottom: 20px;">
                         <div>
                             <h1 style="margin: 0; font-size: 24px; font-weight: 800; color: #1e3a8a; text-transform: uppercase; letter-spacing: 0.5px;">Pedido de Solicitação</h1>
@@ -1570,7 +1878,6 @@
                         </div>
                     </div>
                     
-                    <!-- Meta Informações -->
                     <div style="display: flex; justify-content: space-between; background: #f8fafc; border: 1px solid #e2e8f0; padding: 15px; border-radius: 8px; margin-bottom: 20px; font-size: 14px;">
                         <div>
                             <p style="margin: 0 0 6px 0; color: #475569;"><strong>Solicitante:</strong> <span style="color: #0f172a; font-weight: 600;">${req.userName}</span></p>
@@ -1578,17 +1885,22 @@
                         </div>
                         <div style="text-align: right;">
                             <p style="margin: 0 0 6px 0; color: #475569;"><strong>Data do Pedido:</strong> <span style="color: #0f172a; font-weight: 600;">${req.date}</span></p>
-                            <p style="margin: 0; color: #475569;"><strong>Status Atual:</strong> <span style="color: #1e3a8a; font-weight: bold; text-transform: uppercase;">${req.status === 'pending' ? 'AGUARDANDO LIBERAÇÃO' : req.status === 'approved' ? 'APROVADO' : 'RECUSADO'}</span></p>
+                            <p style="margin: 0; color: #475569;"><strong>Status Atual:</strong> <span style="color: #1e3a8a; font-weight: bold; text-transform: uppercase;">${req.status === 'pending' ? 'AGUARDANDO LIBERAÇÃO' : req.status === 'approved' ? 'LIBERADO' : 'RECUSADO'}</span></p>
                         </div>
                     </div>
 
-                    <!-- Justificativa -->
                     <div style="background-color: #fffbeb; border: 1px solid #fef3c7; padding: 15px; border-radius: 8px; margin-bottom: 25px; font-size: 13px; line-height: 1.5;">
                         <strong style="color: #b45309; display: block; margin-bottom: 5px; text-transform: uppercase; font-size: 11px; letter-spacing: 0.5px;">Finalidade / Justificativa Informada:</strong>
                         <span style="font-style: italic; color: #334155; font-size: 13.5px;">"${req.justification || 'Não informada pelo solicitante.'}"</span>
                     </div>
 
-                    <!-- Tabela de Materiais Organizada -->
+                    ${req.justificativaAlteracao ? `
+                        <div style="background-color: #fef2f2; border: 1px solid #fecaca; padding: 15px; border-radius: 8px; margin-bottom: 25px; font-size: 13px; line-height: 1.5;">
+                            <strong style="color: #991b1b; display: block; margin-bottom: 5px; text-transform: uppercase; font-size: 11px; letter-spacing: 0.5px;">Justificativa para Alteração / Remoção de Itens:</strong>
+                            <span style="font-style: italic; color: #7f1d1d; font-size: 13.5px;">"${req.justificativaAlteracao}"</span>
+                        </div>
+                    ` : ''}
+
                     <table style="width: 100%; border-collapse: collapse; margin-bottom: 40px;">
                         <thead>
                             <tr style="background-color: #1e3a8a; color: #ffffff;">
@@ -1602,7 +1914,6 @@
                         </tbody>
                     </table>
 
-                    <!-- Linhas de Assinatura posicionadas lado a lado -->
                     <div style="display: flex; justify-content: space-between; gap: 50px; margin-top: 80px; font-size: 13px;">
                         <div style="text-align: center; border-top: 1px solid #cbd5e1; flex: 1; padding-top: 10px;">
                             <p style="margin: 0; font-weight: bold; color: #1e293b;">${req.userName}</p>
@@ -1641,13 +1952,11 @@
 
             const template = `
                 <div style="font-family: system-ui, -apple-system, sans-serif; padding: 10px 20px; max-width: 800px; margin: auto; border: 2px solid #0f172a; border-radius: 12px;">
-                    <!-- Topo -->
                     <div style="text-align: center; border-bottom: 2px dashed #0f172a; padding-bottom: 15px; margin-bottom: 20px;">
                         <h1 style="margin: 0; font-size: 24px; letter-spacing: 1.5px; font-weight: 900; color: #0f172a; text-transform: uppercase;">Ordem de Fornecimento</h1>
                         <p style="margin: 5px 0 0 0; font-size: 12px; font-weight: bold; color: #475569; letter-spacing: 1px;">GUIA OFICIAL DE LIBERAÇÃO E SAÍDA DE MATERIAIS</p>
                     </div>
 
-                    <!-- Dados Principais -->
                     <div style="display: flex; justify-content: space-between; font-size: 14px; margin-bottom: 20px; line-height: 1.6;">
                         <div>
                             <p style="margin: 0;"><strong>Destinatário / Requerente:</strong> <span style="color: #0f172a; font-weight: 600;">${req.userName}</span></p>
@@ -1659,12 +1968,10 @@
                         </div>
                     </div>
 
-                    <!-- Justificativa -->
                     <div style="font-size: 13px; background-color: #f1f5f9; padding: 12px; border-radius: 8px; margin-bottom: 25px; border-left: 5px solid #0f172a; line-height: 1.5;">
                         <strong style="color: #0f172a;">Motivo do Fornecimento:</strong> "${req.justification || 'Não detalhada'}"
                     </div>
 
-                    <!-- Tabela de Itens Autêntica -->
                     <table style="width: 100%; border-collapse: collapse; margin-bottom: 50px;">
                         <thead>
                             <tr style="background-color: #0f172a; color: #ffffff;">
@@ -1679,7 +1986,6 @@
                         </tbody>
                     </table>
 
-                    <!-- Assinaturas de Conferência -->
                     <div style="display: flex; justify-content: space-between; gap: 50px; margin-top: 80px; font-size: 13px;">
                         <div style="text-align: center; border-top: 1px solid #0f172a; flex: 1; padding-top: 10px;">
                             <p style="margin: 0; font-weight: bold; color: #0f172a;">${adminName}</p>
@@ -1710,7 +2016,6 @@
             document.getElementById('confirma-senha-input').value = '';
         }
 
-        // Salvar a nova senha no banco
         function salvarNovaSenha(e) {
             e.preventDefault();
             const novaSenha = document.getElementById('nova-senha-input').value;
@@ -1726,19 +2031,18 @@
                 return;
             }
 
-            // Atualiza a senha no Firestore
             db.collection("users").doc(state.currentUser.id).update({ password: novaSenha })
                 .then(() => {
                     state.currentUser.password = novaSenha;
                     saveState();
                     fecharModalSenha();
                     document.getElementById('alerta-senha-padrao').classList.add('hidden');
-                    alert("Sua senha foi updated com sucesso!");
+                    alert("Sua senha foi atualizada com sucesso!");
                 })
                 .catch(err => alert("Erro ao atualizar senha: " + err.message));
         }
 
-        // --- GERAÇÃO DE CÓGIGO EXCLUSIVO PARA O MATERIAL ---
+        // --- GERAÇÃO DE CÓDIGO EXCLUSIVO PARA O MATERIAL ---
         function gerarCodigoMaterial() {
             let codigo;
             let existe = true;
@@ -1750,7 +2054,6 @@
             return codigo;
         }
 
-        // Inicialização do Sistema ao carregar
         window.onload = function() {
             iniciarEscutasFirebase();
             setSession();
