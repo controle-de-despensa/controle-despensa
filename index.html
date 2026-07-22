@@ -173,7 +173,16 @@
                             <h2 class="text-lg font-bold text-gray-900">Catálogo de Materiais</h2>
                             <p class="text-xs text-gray-500">Selecione os materiais e defina a quantidade necessária</p>
                         </div>
-                        <input type="text" id="busca-material" oninput="renderCatalogo()" placeholder="Buscar material..." class="w-full sm:w-64 bg-gray-50 border border-gray-300 rounded-lg px-3 py-1.5 text-sm focus:ring-2 focus:ring-blue-500 outline-none">
+                        <div class="flex flex-wrap sm:flex-nowrap items-center gap-2 w-full sm:w-auto">
+                            <select id="filtro-categoria-catalogo" onchange="renderCatalogo()" class="bg-gray-50 border border-gray-300 rounded-lg px-2.5 py-1.5 text-xs focus:ring-2 focus:ring-blue-500 outline-none">
+                                <option value="todas">Todas as Categorias</option>
+                                <option value="Expediente">Expediente</option>
+                                <option value="Limpeza">Limpeza</option>
+                                <option value="Gêneros Alimentícios">Gêneros Alimentícios</option>
+                                <option value="Mobiliários">Mobiliários</option>
+                            </select>
+                            <input type="text" id="busca-material" oninput="renderCatalogo()" placeholder="Buscar material..." class="w-full sm:w-48 bg-gray-50 border border-gray-300 rounded-lg px-3 py-1.5 text-xs focus:ring-2 focus:ring-blue-500 outline-none">
+                        </div>
                     </div>
 
                     <div class="overflow-x-auto">
@@ -181,6 +190,7 @@
                             <thead>
                                 <tr class="bg-gray-50 text-gray-600 uppercase text-[11px] font-semibold border-b border-gray-200">
                                     <th class="py-3 px-4">Material</th>
+                                    <th class="py-3 px-4 text-center">Categoria</th>
                                     <th class="py-3 px-4 text-center">Unidade</th>
                                     <th class="py-3 px-4 text-center col-saldo">Saldo Disponível</th>
                                     <th class="py-3 px-4 text-center">Ação</th>
@@ -259,6 +269,7 @@
 
         <!-- ================= ABA: MATERIAIS (ADMIN) ================= -->
         <section id="pane-materiais" class="tab-pane hidden">
+
             <!-- Cadastro em Massa -->
             <div class="bg-white p-5 rounded-xl border border-gray-200 shadow-sm mb-6">
                 <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-4">
@@ -266,7 +277,7 @@
                         <h2 class="text-lg font-bold text-gray-900 flex items-center gap-2">
                             <span>📦</span> Cadastro de Materiais
                         </h2>
-                        <p class="text-xs text-gray-500">Cadastre múltiplos materiais de uma vez preenchendo as linhas desejadas.</p>
+                        <p class="text-xs text-gray-500">Cadastre múltiplos materiais de uma vez preenchendo as linhas e definindo as categorias.</p>
                     </div>
                     <button type="button" onclick="addMaterialInputRow()" class="bg-blue-50 hover:bg-blue-100 text-blue-700 font-semibold px-4 py-2 rounded-lg text-xs transition-all border border-blue-200">
                         + Adicionar Outra Linha
@@ -275,12 +286,13 @@
 
                 <form id="form-materiais-massa" onsubmit="salvarMateriaisMassa(event)">
                     <div class="overflow-x-auto mb-4">
-                        <table class="w-full text-left border-collapse text-sm min-w-[600px]">
+                        <table class="w-full text-left border-collapse text-sm min-w-[700px]">
                             <thead>
                                 <tr class="bg-gray-50 text-gray-600 uppercase text-xs font-semibold border-b border-gray-200">
-                                    <th class="py-2.5 px-3 w-7/12">Nome do Material</th>
-                                    <th class="py-2.5 px-3 w-2/12 text-center">Unidade (Ex: Un, Pacote, Cx)</th>
-                                    <th class="py-2.5 px-3 w-2/12 text-center">Saldo Inicial</th>
+                                    <th class="py-2.5 px-3 w-5/12">Nome do Material</th>
+                                    <th class="py-2.5 px-3 w-3/12">Categoria</th>
+                                    <th class="py-2.5 px-3 w-2/12 text-center">Unidade</th>
+                                    <th class="py-2.5 px-3 w-1/12 text-center">Saldo Inicial</th>
                                     <th class="py-2.5 px-3 w-1/12 text-center">Remover</th>
                                 </tr>
                             </thead>
@@ -297,23 +309,29 @@
                 </form>
             </div>
 
-            <!-- Listagem e Botão de Impressão -->
+            <!-- Listagem e Botões de Impressão/Exportação -->
             <div class="bg-white p-5 rounded-xl border border-gray-200 shadow-sm">
                 <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-4">
                     <h2 class="text-lg font-bold text-gray-900">Estoque Atualizado</h2>
-                    <button onclick="imprimirEstoqueCompleto()" class="bg-gray-800 hover:bg-gray-950 text-white font-semibold px-4 py-2 rounded-lg text-xs flex items-center gap-2 shadow-sm transition-all">
-                        <span>🖨️</span> Imprimir Relatório de Saldos
-                    </button>
+                    <div class="flex items-center gap-2 flex-wrap">
+                        <button onclick="exportarEstoqueCSV()" class="bg-emerald-700 hover:bg-emerald-800 text-white font-semibold px-4 py-2 rounded-lg text-xs flex items-center gap-2 shadow-sm transition-all">
+                            <span>📊</span> Exportar CSV (Excel)
+                        </button>
+                        <button onclick="imprimirEstoqueCompleto()" class="bg-gray-800 hover:bg-gray-950 text-white font-semibold px-4 py-2 rounded-lg text-xs flex items-center gap-2 shadow-sm transition-all">
+                            <span>🖨️</span> Imprimir Relatório de Saldos
+                        </button>
+                    </div>
                 </div>
                 <div class="overflow-x-auto">
                     <table class="w-full text-left border-collapse text-sm">
                         <thead>
                             <tr class="bg-gray-50 text-gray-600 uppercase text-xs font-semibold border-b border-gray-200">
                                 <th class="py-3 px-4 w-2/12">Código</th>
-                                <th class="py-3 px-4 w-5/12">Material</th>
-                                <th class="py-3 px-4 text-center w-2/12">Unidade</th>
+                                <th class="py-3 px-4 w-3/12">Material</th>
+                                <th class="py-3 px-4 w-2/12 text-center">Categoria</th>
+                                <th class="py-3 px-4 text-center w-1/12">Unidade</th>
                                 <th class="py-3 px-4 text-center w-1/12">Saldo Físico</th>
-                                <th class="py-3 px-4 text-center w-2/12">Ações</th>
+                                <th class="py-3 px-4 text-center w-3/12">Ações</th>
                             </tr>
                         </thead>
                         <tbody id="estoque-tbody" class="divide-y divide-gray-100">
@@ -337,11 +355,22 @@
         <!-- ================= ABA: HISTÓRICO ================= -->
         <section id="pane-historico" class="tab-pane hidden">
             <div class="bg-white p-5 rounded-xl border border-gray-200 shadow-sm">
-                <div class="flex justify-between items-center mb-4">
+                <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-4">
                     <h2 class="text-lg font-bold text-gray-900" id="historico-titulo">Histórico de Pedidos</h2>
-                    <button id="btn-limpar-historico" onclick="limparHistorico()" class="text-xs text-red-500 hover:text-red-700 font-semibold">
-                        Limpar Histórico
-                    </button>
+                    <div class="flex items-center gap-2 flex-wrap">
+                        <select id="filtro-status-historico" onchange="renderHistorico()" class="bg-gray-50 border border-gray-300 text-xs rounded-lg p-2 font-medium focus:ring-2 focus:ring-blue-500 outline-none">
+                            <option value="todos">Todos os Status</option>
+                            <option value="pending">Pendentes</option>
+                            <option value="approved">Liberados</option>
+                            <option value="rejected">Recusados</option>
+                        </select>
+                        <button onclick="exportarHistoricoCSV()" class="bg-emerald-700 hover:bg-emerald-800 text-white font-semibold text-xs px-3.5 py-2 rounded-lg shadow-sm transition-all flex items-center gap-1">
+                            📊 Exportar CSV
+                        </button>
+                        <button id="btn-limpar-historico" onclick="limparHistorico()" class="text-xs text-red-500 hover:text-red-700 font-semibold ml-2">
+                            Limpar Histórico
+                        </button>
+                    </div>
                 </div>
                 <div class="overflow-x-auto">
                     <table class="w-full text-left border-collapse text-sm">
@@ -370,7 +399,7 @@
         <p>Sistema de Gestão de Despensa • Firebase Firestore Realtime • 2026</p>
     </footer>
 
-    <!-- ================= MODAL VER / EDITAR PEDIDO (OTIMIZADO PARA TELA ÚNICA) ================= -->
+    <!-- ================= MODAL VER / EDITAR PEDIDO ================= -->
     <div id="modal-ver-pedido" class="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm hidden items-center justify-center p-2 sm:p-4">
         <div class="bg-white rounded-2xl shadow-2xl border border-gray-100 p-4 sm:p-5 w-full max-w-4xl flex flex-col max-h-[92vh]">
             <div class="flex justify-between items-center mb-3 pb-2 border-b flex-shrink-0">
@@ -417,7 +446,7 @@
     <!-- Script de Funcionamento Interno -->
     <script>
         // ============================================================
-        // ⚠️ CREDENCIAIS DO FIREBASE:
+        // CREDENCIAIS DO FIREBASE:
         // ============================================================
         const firebaseConfig = {
             apiKey: "AIzaSyDjZMvdBPNnAFQGeE8NzqHJVmjwqJqWbpQ",
@@ -443,11 +472,11 @@
             cart: [] 
         };
         
-        // Controle de Edição do Modal (Cópia Temporária Isolada)
+        // Controle de Edição do Modal
         let idPedidoAberto = null; 
         let pedidoEmEdicao = null; 
 
-        // Escutas em Tempo Real do Firebase (Sincronização Automática)
+        // Escutas em Tempo Real do Firebase
         function iniciarEscutasFirebase() {
             // 1. Escutar usuários cadastrados
             db.collection("users").onSnapshot((querySnapshot) => {
@@ -501,7 +530,6 @@
                 renderHistorico();
                 renderTabsMenu();
 
-                // Atualiza o modal caso esteja aberto
                 if (idPedidoAberto && pedidoEmEdicao) {
                     const atualizado = state.requests.find(r => r.id === idPedidoAberto);
                     if (atualizado && atualizado.status !== pedidoEmEdicao.status) {
@@ -523,11 +551,13 @@
 
         function criarMateriaisPadrao() {
             const defaults = [
-                { code: 'MAT-1502', name: 'Arroz Agulhinha Tipo 1', unit: 'Saco 5kg', balance: 15 },
-                { code: 'MAT-3829', name: 'Azeite de Oliva Extra Virgem', unit: 'Garrafa 500ml', balance: 3 },
-                { code: 'MAT-8291', name: 'Açúcar Refinado', unit: 'Pct 1kg', balance: 30 },
-                { code: 'MAT-4721', name: 'Café Torrado e Moído', unit: 'Vácuo 500g', balance: 2 },
-                { code: 'MAT-9031', name: 'Detergente Neutro Concentrado', unit: 'Frasco 500ml', balance: 25 }
+                { code: 'MAT-1502', name: 'Arroz Agulhinha Tipo 1', category: 'Gêneros Alimentícios', unit: 'Saco 5kg', balance: 15 },
+                { code: 'MAT-3829', name: 'Azeite de Oliva Extra Virgem', category: 'Gêneros Alimentícios', unit: 'Garrafa 500ml', balance: 3 },
+                { code: 'MAT-8291', name: 'Açúcar Refinado', category: 'Gêneros Alimentícios', unit: 'Pct 1kg', balance: 30 },
+                { code: 'MAT-4721', name: 'Café Torrado e Moído', category: 'Gêneros Alimentícios', unit: 'Vácuo 500g', balance: 2 },
+                { code: 'MAT-9031', name: 'Detergente Neutro Concentrado', category: 'Limpeza', unit: 'Frasco 500ml', balance: 25 },
+                { code: 'MAT-1042', name: 'Papel A4 Sulfite 75g', category: 'Expediente', unit: 'Resma 500fls', balance: 10 },
+                { code: 'MAT-5510', name: 'Cadeira Giratória Ergonômica', category: 'Mobiliários', unit: 'Unidade', balance: 4 }
             ];
             defaults.forEach(m => db.collection("materials").add(m));
         }
@@ -685,12 +715,16 @@
         function renderCatalogo() {
             if (!state.currentUser) return;
             const query = document.getElementById('busca-material').value.toLowerCase();
+            const categoriaFiltro = document.getElementById('filtro-categoria-catalogo') ? document.getElementById('filtro-categoria-catalogo').value : 'todas';
             const tbody = document.getElementById('catalogo-tbody');
             
-            const filtered = state.materials.filter(m => m.name.toLowerCase().includes(query));
-            
+            let filtered = state.materials.filter(m => m.name.toLowerCase().includes(query));
+            if (categoriaFiltro !== 'todas') {
+                filtered = filtered.filter(m => m.category === categoriaFiltro);
+            }
+
             if (filtered.length === 0) {
-                tbody.innerHTML = `<tr><td colspan="4" class="py-8 text-center text-gray-400">Nenhum material encontrado no estoque.</td></tr>`;
+                tbody.innerHTML = `<tr><td colspan="5" class="py-8 text-center text-gray-400">Nenhum material encontrado no estoque.</td></tr>`;
                 return;
             }
 
@@ -706,17 +740,22 @@
                     ? "bg-red-100 text-red-700 border border-red-200 font-extrabold" 
                     : "bg-slate-100 text-slate-600 font-semibold";
 
-                const rowClass = isLowStock ? "bg-red-50 hover:bg-red-100" : "hover:bg-gray-50";
-                const notificationHtml = isLowStock ? `<span class="bg-red-200 text-red-800 text-[10px] font-bold px-1.5 py-0.5 rounded ml-2 inline-flex items-center gap-1 animate-pulse">⚠️ BAIXO ESTOQUE</span>` : '';
+                const alertBadge = isLowStock 
+                    ? `<span class="inline-flex items-center text-[9px] bg-red-100 text-red-700 font-extrabold px-1.5 py-0.5 rounded border border-red-200 ml-1" title="Estoque Baixo">⚠️ Baixo</span>` 
+                    : '';
+
+                const rowClass = isLowStock ? "bg-red-50/50 hover:bg-red-100/60" : "hover:bg-gray-50";
 
                 html += `
                     <tr class="${rowClass} transition-colors text-xs">
                         <td class="py-2 px-4 font-medium text-gray-950">
-                            <span class="text-[10px] font-mono ${codeClass} px-1.5 py-0.5 rounded mr-2">${m.code || 'S/C'}</span>
-                            ${m.name} ${notificationHtml}
+                            <span class="text-[10px] font-mono ${codeClass} px-1.5 py-0.5 rounded mr-1">${m.code || 'S/C'}</span>
+                            ${alertBadge}
+                            <span class="ml-1">${m.name}</span>
                         </td>
+                        <td class="py-2 px-4 text-center text-gray-600 font-semibold">${m.category || 'Geral'}</td>
                         <td class="py-2 px-4 text-center text-gray-500">${m.unit}</td>
-                        <td class="py-2 px-4 text-center font-bold text-gray-700 col-saldo">${m.balance}</td>
+                        <td class="py-2 px-4 text-center font-bold ${isLowStock ? 'text-red-600' : 'text-gray-700'} col-saldo">${m.balance}</td>
                         <td class="py-2 px-4 text-center">${buttonHtml}</td>
                     </tr>
                 `;
@@ -769,7 +808,7 @@
                                 <span class="font-mono text-[10px] ${codeClass} mr-1">[${material.code || 'S/C'}]</span>
                                 ${material.name}
                             </p>
-                            <span class="text-[11px] text-gray-500">${material.unit}</span>
+                            <span class="text-[11px] text-gray-500">${material.category ? material.category + ' • ' : ''}${material.unit}</span>
                         </div>
                         <div class="flex items-center gap-1.5 flex-shrink-0">
                             <input type="number" min="1" value="${item.qty}" onchange="updateCartQty('${material.id}', this.value)" class="w-14 text-center bg-white border border-gray-300 rounded p-1 text-xs font-medium focus:ring-1 focus:ring-blue-500 outline-none">
@@ -821,6 +860,7 @@
                         materialId: item.materialId,
                         code: mat.code || 'S/C', 
                         name: mat.name,
+                        category: mat.category || 'Geral',
                         unit: mat.unit,
                         qtyRequested: item.qty,
                         qtyOriginal: item.qty
@@ -937,10 +977,18 @@
             tr.className = "hover:bg-gray-50 border-b border-gray-100";
             tr.innerHTML = `
                 <td class="py-2 px-1">
-                    <input type="text" placeholder="Nome do Material (Ex: Arroz Tipo 1)" required class="w-full bg-white border border-gray-300 rounded px-3 py-1.5 text-sm focus:ring-1 focus:ring-blue-500 outline-none mat-name">
+                    <input type="text" placeholder="Nome do Material" required class="w-full bg-white border border-gray-300 rounded px-3 py-1.5 text-sm focus:ring-1 focus:ring-blue-500 outline-none mat-name">
                 </td>
                 <td class="py-2 px-1">
-                    <input type="text" placeholder="Ex: Unidade, Saco 5kg" required class="w-full bg-white border border-gray-300 rounded px-3 py-1.5 text-sm focus:ring-1 focus:ring-blue-500 outline-none text-center mat-unit">
+                    <select required class="w-full bg-white border border-gray-300 rounded px-2 py-1.5 text-sm focus:ring-1 focus:ring-blue-500 outline-none mat-category">
+                        <option value="Expediente">Expediente</option>
+                        <option value="Limpeza">Limpeza</option>
+                        <option value="Gêneros Alimentícios">Gêneros Alimentícios</option>
+                        <option value="Mobiliários">Mobiliários</option>
+                    </select>
+                </td>
+                <td class="py-2 px-1">
+                    <input type="text" placeholder="Ex: Un, Pct, Caixa" required class="w-full bg-white border border-gray-300 rounded px-3 py-1.5 text-sm focus:ring-1 focus:ring-blue-500 outline-none text-center mat-unit">
                 </td>
                 <td class="py-2 px-1">
                     <input type="number" min="0" value="0" required class="w-full bg-white border border-gray-300 rounded px-3 py-1.5 text-sm focus:ring-1 focus:ring-blue-500 outline-none text-center mat-balance">
@@ -1006,6 +1054,7 @@
 
             rows.forEach(row => {
                 const name = row.querySelector('.mat-name').value.trim();
+                const category = row.querySelector('.mat-category').value;
                 const unit = row.querySelector('.mat-unit').value.trim();
                 const balance = parseInt(row.querySelector('.mat-balance').value) || 0;
 
@@ -1013,6 +1062,7 @@
                     const materialData = {
                         code: gerarCodigoMaterial(), 
                         name: name,
+                        category: category,
                         unit: unit,
                         balance: balance
                     };
@@ -1034,7 +1084,7 @@
         function renderEstoqueList() {
             const tbody = document.getElementById('estoque-tbody');
             if (state.materials.length === 0) {
-                tbody.innerHTML = `<tr><td colspan="5" class="py-8 text-center text-gray-400">Carregando almoxarifado...</td></tr>`;
+                tbody.innerHTML = `<tr><td colspan="6" class="py-8 text-center text-gray-400">Carregando almoxarifado...</td></tr>`;
                 return;
             }
 
@@ -1042,20 +1092,28 @@
             state.materials.forEach(mat => {
                 const isLowStock = mat.balance < 5;
                 const codeClass = isLowStock 
-                    ? "text-red-600 bg-red-50 border border-red-100 px-1.5 py-0.5 rounded font-extrabold" 
-                    : "text-blue-900";
+                    ? "text-red-700 bg-red-100 border border-red-200 px-1.5 py-0.5 rounded font-extrabold" 
+                    : "text-blue-900 font-semibold";
 
-                const rowClass = isLowStock ? "bg-red-50 hover:bg-red-100" : "hover:bg-gray-50";
-                const notificationHtml = isLowStock ? `<span class="bg-red-200 text-red-800 text-[10px] font-bold px-1.5 py-0.5 rounded ml-2 inline-flex items-center gap-1 animate-pulse">⚠️ BAIXO ESTOQUE</span>` : '';
+                const alertBadge = isLowStock 
+                    ? `<span class="inline-flex items-center text-[9px] bg-red-100 text-red-700 font-extrabold px-1.5 py-0.5 rounded border border-red-200 ml-1.5" title="Estoque abaixo de 5 unidades">⚠️ Baixo</span>` 
+                    : '';
+
+                const rowClass = isLowStock ? "bg-red-50/40 hover:bg-red-100/50" : "hover:bg-gray-50";
 
                 html += `
                     <tr class="${rowClass}">
-                        <td class="py-3 px-4 font-mono text-xs font-bold ${codeClass}">${mat.code || 'S/C'}</td>
-                        <td class="py-3 px-4 font-medium text-gray-900">${mat.name} ${notificationHtml}</td>
+                        <td class="py-3 px-4 font-mono text-xs">
+                            <span class="${codeClass}">${mat.code || 'S/C'}</span>
+                            ${alertBadge}
+                        </td>
+                        <td class="py-3 px-4 font-medium text-gray-900">${mat.name}</td>
+                        <td class="py-3 px-4 text-center text-xs font-semibold text-gray-600">${mat.category || 'Geral'}</td>
                         <td class="py-3 px-4 text-center text-gray-600">${mat.unit}</td>
-                        <td class="py-3 px-4 text-center font-bold text-blue-600">${mat.balance}</td>
+                        <td class="py-3 px-4 text-center font-bold ${isLowStock ? 'text-red-600' : 'text-blue-600'}">${mat.balance}</td>
                         <td class="py-3 px-4 text-center">
-                            <button onclick="ajustarSaldo('${mat.id}')" class="text-blue-600 hover:underline text-xs mr-3">Ajustar Saldo</button>
+                            <button onclick="ajustarSaldo('${mat.id}')" class="text-blue-600 hover:underline text-xs mr-2">Ajustar Saldo</button>
+                            <button onclick="alterarCategoria('${mat.id}')" class="text-amber-600 hover:underline text-xs mr-2">Alterar Categoria</button>
                             <button onclick="excluirMaterial('${mat.id}')" class="text-red-500 hover:underline text-xs">Excluir</button>
                         </td>
                     </tr>
@@ -1080,12 +1138,104 @@
             }
         }
 
+        // Nova função para alterar a categoria do material cadastrado
+        function alterarCategoria(id) {
+            const mat = state.materials.find(m => m.id === id);
+            if (!mat) return;
+
+            const novaCategoria = prompt(
+                `Alterar categoria de "${mat.name}".\n\nCategoria atual: ${mat.category || 'Geral'}\n\nDigite a nova categoria (Ex: Expediente, Limpeza, Gêneros Alimentícios, Mobiliários):`,
+                mat.category || 'Geral'
+            );
+
+            if (novaCategoria !== null) {
+                const catLimpa = novaCategoria.trim();
+                if (catLimpa !== "") {
+                    db.collection("materials").doc(id).update({ category: catLimpa })
+                        .then(() => alert("Categoria alterada com sucesso!"))
+                        .catch(err => alert("Erro ao atualizar categoria: " + err.message));
+                } else {
+                    alert("A categoria não pode ficar em branco.");
+                }
+            }
+        }
+
         function excluirMaterial(id) {
             if (confirm("Tem certeza que deseja excluir permanentemente este material do estoque?")) {
                 db.collection("materials").doc(id).delete()
                     .then(() => alert("Material excluído com sucesso!"))
                     .catch(err => alert("Erro ao excluir material: " + err.message));
             }
+        }
+
+        // ================= FUNÇÕES DE EXPORTAÇÃO CSV =================
+
+        function exportarEstoqueCSV() {
+            if (!state.materials || state.materials.length === 0) {
+                alert("Não há dados de estoque para exportar.");
+                return;
+            }
+            let csvContent = "data:text/csv;charset=utf-8,\uFEFF";
+            csvContent += "Codigo;Material;Categoria;Unidade;Saldo Fisico\n";
+
+            state.materials.forEach(mat => {
+                const code = (mat.code || 'S/C').replace(/"/g, '""');
+                const name = (mat.name || '').replace(/"/g, '""');
+                const category = (mat.category || 'Geral').replace(/"/g, '""');
+                const unit = (mat.unit || '').replace(/"/g, '""');
+                const balance = mat.balance || 0;
+                csvContent += `"${code}";"${name}";"${category}";"${unit}";"${balance}"\n`;
+            });
+
+            const encodedUri = encodeURI(csvContent);
+            const link = document.createElement("a");
+            link.setAttribute("href", encodedUri);
+            link.setAttribute("download", `Relatorio_Estoque_${new Date().toISOString().slice(0,10)}.csv`);
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }
+
+        function exportarHistoricoCSV() {
+            if (!state.requests || state.requests.length === 0) {
+                alert("Não há pedidos no histórico para exportar.");
+                return;
+            }
+
+            const filtro = document.getElementById('filtro-status-historico') ? document.getElementById('filtro-status-historico').value : 'todos';
+            let dados = state.requests.filter(r => r.ativo !== false);
+            if (filtro !== 'todos') {
+                dados = dados.filter(r => r.status === filtro);
+            }
+
+            if (dados.length === 0) {
+                alert("Nenhum registro encontrado para o filtro selecionado.");
+                return;
+            }
+
+            let csvContent = "data:text/csv;charset=utf-8,\uFEFF";
+            csvContent += "ID;Data/Hora;Solicitante;Setor;Justificativa;Status;Processado Por\n";
+
+            dados.forEach(req => {
+                const id = (req.id || '').replace(/"/g, '""');
+                const data = (req.dateProcessed || req.date || '').replace(/"/g, '""');
+                const user = (req.userName || '').replace(/"/g, '""');
+                const sector = (req.userSector || '').replace(/"/g, '""');
+                const just = (req.justification || '').replace(/"/g, '""').replace(/\n/g, ' ');
+                const statusMap = { pending: 'Pendente', approved: 'Liberado', rejected: 'Recusado' };
+                const status = statusMap[req.status] || req.status;
+                const approvedBy = (req.approvedBy || '-').replace(/"/g, '""');
+
+                csvContent += `"${id}";"${data}";"${user}";"${sector}";"${just}";"${status}";"${approvedBy}"\n`;
+            });
+
+            const encodedUri = encodeURI(csvContent);
+            const link = document.createElement("a");
+            link.setAttribute("href", encodedUri);
+            link.setAttribute("download", `Historico_Pedidos_${new Date().toISOString().slice(0,10)}.csv`);
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
         }
 
         // ================= FUNÇÕES: ABA PENDENTES (ADMIN) =================
@@ -1147,7 +1297,6 @@
         function atualizarQuantidadeSolicitadaModal(materialId, novaQtd) {
             if (!pedidoEmEdicao) return;
             
-            // Trava caso o status não seja pendente
             if (pedidoEmEdicao.status !== 'pending') {
                 alert("Ação bloqueada! Este pedido já foi liberado ou recusado.");
                 renderConteudoModal();
@@ -1170,7 +1319,6 @@
         function removerItemSolicitacaoModal(materialId) {
             if (!pedidoEmEdicao) return;
 
-            // Trava caso o status não seja pendente
             if (pedidoEmEdicao.status !== 'pending') {
                 alert("Ação bloqueada! Este pedido já foi liberado ou recusado.");
                 return;
@@ -1221,6 +1369,7 @@
                     materialId: mat.id,
                     code: mat.code || 'S/C',
                     name: mat.name,
+                    category: mat.category || 'Geral',
                     unit: mat.unit,
                     qtyRequested: qty,
                     qtyOriginal: 0
@@ -1263,7 +1412,6 @@
             pedidoEmEdicao = null;
         }
 
-        // ================= FUNÇÃO PARA SALVAR ALTERAÇÃO DO USUÁRIO =================
         async function salvarEdicaoPedidoModal(id) {
             if (!pedidoEmEdicao) return;
 
@@ -1278,7 +1426,6 @@
             }
 
             try {
-                // 🔒 VALIDAÇÃO DE SEGURANÇA EM TEMPO REAL NO FIRESTORE
                 const docRef = db.collection("requests").doc(id);
                 const docSnap = await docRef.get();
 
@@ -1289,7 +1436,6 @@
 
                 const statusAtualBanco = docSnap.data().status;
 
-                // Bloqueia qualquer salvamento se o status mudou de 'pending'
                 if (statusAtualBanco !== 'pending') {
                     const statusNome = statusAtualBanco === 'approved' ? 'LIBERADO' : 'RECUSADO';
                     alert(`Ação bloqueada! O pedido já foi ${statusNome} pelo almoxarifado e não pode mais ser alterado.`);
@@ -1297,7 +1443,6 @@
                     return;
                 }
 
-                // Salva alterações
                 await docRef.update({
                     items: pedidoEmEdicao.items,
                     removedItems: pedidoEmEdicao.removedItems || [],
@@ -1312,7 +1457,6 @@
             }
         }
 
-        // ================= RENDERIZAÇÃO OTIMIZADA DO MODAL (TELA ÚNICA) =================
         function renderConteudoModal() {
             if (!pedidoEmEdicao) return;
 
@@ -1320,7 +1464,8 @@
             const corpo = document.getElementById('modal-pedido-corpo');
             const botoes = document.getElementById('modal-pedido-botoes');
 
-            // Regra: Pode editar se o pedido for 'pending' E (for Admin OU o próprio Solicitante)
+            const isAdmin = state.currentUser && state.currentUser.role === 'admin';
+
             const eEditavel = req.status === 'pending' && state.currentUser && (state.currentUser.role === 'admin' || req.userId === state.currentUser.id);
 
             const temItemReduzido = req.items.some(item => {
@@ -1340,11 +1485,14 @@
                     const origQty = item.qtyOriginal !== undefined ? item.qtyOriginal : item.qtyRequested;
                     
                     const faltaEstoque = item.qtyRequested > saldoAtual;
-                    const stockBadge = faltaEstoque 
-                        ? `<span class="text-red-600 font-bold text-[10px] bg-red-50 px-1.5 py-0.5 rounded">⚠️ Insuficiente (${saldoAtual})</span>`
-                        : `<span class="text-emerald-700 text-[10px] bg-emerald-50 px-1.5 py-0.5 rounded">✓ Disp. (${saldoAtual})</span>`;
+                    
+                    const stockBadge = isAdmin 
+                        ? (faltaEstoque 
+                            ? `<span class="text-red-600 font-bold text-[10px] bg-red-50 px-1.5 py-0.5 rounded">⚠️ Insuficiente (${saldoAtual})</span>`
+                            : `<span class="text-emerald-700 text-[10px] bg-emerald-50 px-1.5 py-0.5 rounded">✓ Disp. (${saldoAtual})</span>`)
+                        : '';
 
-                    const isLowStock = saldoAtual < 5;
+                    const isLowStock = saldoAtual < 5 && isAdmin;
                     const codeClass = isLowStock 
                         ? "text-red-600 bg-red-50 border border-red-200 px-1 py-0.5 rounded font-extrabold" 
                         : "text-slate-500 font-semibold";
@@ -1381,7 +1529,7 @@
                     const saldoAtual = originalMaterial ? originalMaterial.balance : 0;
                     const origQty = item.qtyOriginal !== undefined ? item.qtyOriginal : item.qtyRequested;
                     
-                    const isLowStock = saldoAtual < 5 && state.currentUser.role === 'admin';
+                    const isLowStock = saldoAtual < 5 && isAdmin;
                     const codeClass = isLowStock 
                         ? "text-red-600 bg-red-50 border border-red-200 px-1 py-0.5 rounded font-extrabold" 
                         : "text-slate-500 font-semibold";
@@ -1403,13 +1551,13 @@
                 });
             }
 
-            // BARRA DE ADIÇÃO DE MATERIAL INTEGRADAS DE FORMA COMPACTA
             let addMaterialSectionHtml = '';
             if (eEditavel) {
                 const disponiveis = state.materials.filter(m => !req.items.some(i => i.materialId === m.id));
                 let optionsHtml = '<option value="">-- Selecione um material --</option>';
                 disponiveis.forEach(m => {
-                    optionsHtml += `<option value="${m.id}">${m.name} (${m.unit}) - Saldo: ${m.balance}</option>`;
+                    const saldoTxt = isAdmin ? ` - Saldo: ${m.balance}` : '';
+                    optionsHtml += `<option value="${m.id}">${m.name} (${m.unit})${saldoTxt}</option>`;
                 });
 
                 addMaterialSectionHtml = `
@@ -1471,7 +1619,6 @@
                     : '<span class="bg-red-100 text-red-800 text-[10px] px-2 py-0.5 rounded-full font-semibold uppercase">Recusado</span>';
 
             corpo.innerHTML = `
-                <!-- PAINEL SUPERIOR COMPACTO (GRILLA 2 COLUNAS) -->
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <div class="bg-gray-50 p-2.5 rounded-xl border border-gray-200 text-xs flex justify-between items-center">
                         <div>
@@ -1495,10 +1642,8 @@
                 ${removedItemsBlock}
                 ${justificativaAlteracaoBlock}
 
-                <!-- BARRA DE INCLUSÃO DE MATERIAL -->
                 ${addMaterialSectionHtml}
 
-                <!-- TABELA DE MATERIAIS COM ROLAGEM DEDICADA -->
                 <div>
                     <h4 class="text-xs font-bold text-gray-700 uppercase mb-1">Materiais Solicitados (${req.items.length})</h4>
                     <div class="overflow-y-auto max-h-48 border border-gray-200 rounded-lg">
@@ -1541,7 +1686,6 @@
                     `;
                 }
             } else {
-                // 🔒 BLOQUEIO VISUAL CASO STATUS SEJA LIBERADO OU RECUSADO
                 const statusTxt = req.status === 'approved' ? 'Liberado' : 'Recusado';
                 botoesHtml += `
                     <span class="inline-flex items-center gap-1 bg-gray-100 text-gray-500 text-xs px-3 py-1.5 rounded-lg font-semibold border border-gray-200" title="Pedidos processados não podem ser alterados">
@@ -1695,6 +1839,12 @@
                 pedidosExibicao = state.requests.filter(r => r.userId === state.currentUser.id && r.ativo !== false);
             }
 
+            const filtroStatusEl = document.getElementById('filtro-status-historico');
+            const statusSelecionado = filtroStatusEl ? filtroStatusEl.value : 'todos';
+            if (statusSelecionado !== 'todos') {
+                pedidosExibicao = pedidosExibicao.filter(r => r.status === statusSelecionado);
+            }
+
             if (pedidosExibicao.length === 0) {
                 tbody.innerHTML = `<tr><td colspan="6" class="py-8 text-center text-gray-400">Nenhum pedido encontrado no histórico.</td></tr>`;
                 return;
@@ -1807,6 +1957,7 @@
                     <tr style="border-bottom: 1px solid #ddd;">
                         <td style="padding: 8px 12px; text-align: left; font-family: monospace; font-size: 12px; font-weight: bold; color: #1e3a8a;">${mat.code || 'S/C'}</td>
                         <td style="padding: 8px 12px; text-align: left;">${mat.name}</td>
+                        <td style="padding: 8px 12px; text-align: center;">${mat.category || 'Geral'}</td>
                         <td style="padding: 8px 12px; text-align: center;">${mat.unit}</td>
                         <td style="padding: 8px 12px; text-align: center; font-weight: bold;">${mat.balance}</td>
                     </tr>
@@ -1824,10 +1975,11 @@
                     <table style="width: 100%; border-collapse: collapse; margin-top: 10px;">
                         <thead>
                             <tr style="background-color: #1e3a8a; color: #ffffff; border-bottom: 2px solid #102a43;">
-                                <th style="padding: 10px 12px; text-align: left; width: 120px; color: #ffffff;">Código</th>
+                                <th style="padding: 10px 12px; text-align: left; width: 100px; color: #ffffff;">Código</th>
                                 <th style="padding: 10px 12px; text-align: left; color: #ffffff;">Descrição do Material</th>
-                                <th style="padding: 10px 12px; text-align: center; width: 150px; color: #ffffff;">Unidade</th>
-                                <th style="padding: 10px 12px; text-align: center; width: 150px; color: #ffffff;">Saldo Físico</th>
+                                <th style="padding: 10px 12px; text-align: center; width: 140px; color: #ffffff;">Categoria</th>
+                                <th style="padding: 10px 12px; text-align: center; width: 100px; color: #ffffff;">Unidade</th>
+                                <th style="padding: 10px 12px; text-align: center; width: 100px; color: #ffffff;">Saldo Físico</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -1959,7 +2111,6 @@
 
                     <div style="display: flex; justify-content: space-between; font-size: 14px; margin-bottom: 20px; line-height: 1.6;">
                         <div>
-                            <p style="margin: 0;"><strong>Destinatário / Requerente:</strong> <span style="color: #0f172a; font-weight: 600;">${req.userName}</span></p>
                             <p style="margin: 0;"><strong>Destino / Setor:</strong> <span style="color: #0f172a; font-weight: 600;">${req.userSector}</span></p>
                         </div>
                         <div style="text-align: right;">
@@ -1992,8 +2143,8 @@
                             <p style="margin: 4px 0 0 0; font-size: 11px; color: #475569; text-transform: uppercase; font-weight: 600;">Autorizador da Baixa (Almoxarife)</p>
                         </div>
                         <div style="text-align: center; border-top: 1px solid #0f172a; flex: 1; padding-top: 10px;">
-                            <p style="margin: 0; font-weight: bold; color: #0f172a;">${req.userName}</p>
-                            <p style="margin: 4px 0 0 0; font-size: 11px; color: #475569; text-transform: uppercase; font-weight: 600;">Recebedor (Solicitante)</p>
+                            <p style="margin: 0; font-weight: bold; color: #0f172a;">&nbsp;</p>
+                            <p style="margin: 4px 0 0 0; font-size: 11px; color: #475569; text-transform: uppercase; font-weight: 600;">Assinatura do Recebedor / Nome por Extenso</p>
                         </div>
                     </div>
                 </div>
