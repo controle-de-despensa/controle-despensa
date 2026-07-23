@@ -704,7 +704,7 @@
             switchTab(state.currentTab);
         }
 
-        // RENDERIZAÇÃO DAS ABAS (NOVO DESIGN ESTILIZADO)
+        // RENDERIZAÇÃO DAS ABAS
         function renderTabsMenu() {
             if (!state.currentUser) return;
             const nav = document.getElementById('nav-tabs');
@@ -725,7 +725,6 @@
 
                 const isActive = state.currentTab === tab.id;
                 
-                // Estilização das abas em estilo de botão selecionável (Pill control)
                 const activeClasses = isActive 
                     ? "bg-white text-blue-800 font-bold shadow-xs border border-gray-200/80 scale-[1.01]" 
                     : "text-gray-600 hover:text-gray-900 hover:bg-white/60 font-medium border border-transparent";
@@ -1127,7 +1126,7 @@
 
                 if (name && unit) {
                     const materialData = {
-                        code: gerarCodigoMaterial(), 
+                        code: 'MAT-' + Math.floor(1000 + Math.random() * 9000), 
                         name: name,
                         category: category,
                         unit: unit,
@@ -1161,7 +1160,6 @@
             const catInput = document.getElementById('filtro-categoria-estoque');
             const categoriaFiltro = catInput ? catInput.value : 'todas';
 
-            // Filtragem por busca (nome ou código) e categoria
             let filtered = state.materials.filter(m => {
                 const matchName = m.name.toLowerCase().includes(query);
                 const matchCode = (m.code || '').toLowerCase().includes(query);
@@ -1355,8 +1353,8 @@
                                 <button onclick="abrirModalPedido('${req.id}')" class="bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs px-3.5 py-1.5 rounded-lg transition-all flex items-center gap-1.5 shadow-sm">
                                     👀 Ver / Editar Pedido
                                 </button>
-                                <button onclick="imprimirOrdemFornecimento('${req.id}')" class="border border-blue-200 hover:bg-blue-50 text-blue-700 font-semibold text-xs px-3 py-1.5 rounded-lg transition-all flex items-center gap-1.5">
-                                    📜 Imprimir Ordem de Fornecimento
+                                <button onclick="imprimirPedido('${req.id}')" class="border border-blue-200 hover:bg-blue-50 text-blue-700 font-semibold text-xs px-3 py-1.5 rounded-lg transition-all flex items-center gap-1.5">
+                                    🖨️ Imprimir Pedido
                                 </button>
                             </div>
                         </div>
@@ -1784,7 +1782,7 @@
 
             botoesHtml += `
                 <button onclick="imprimirPedido('${req.id}')" class="bg-blue-700 hover:bg-blue-800 text-white font-semibold text-xs px-3.5 py-1.5 rounded-lg transition-all flex items-center gap-1">
-                    🖨️ Imprimir
+                    🖨️ Imprimir Pedido
                 </button>
                 ${(req.status === 'approved' && state.currentUser && state.currentUser.role === 'admin') ? `
                     <button onclick="imprimirOrdemFornecimento('${req.id}')" class="bg-emerald-700 hover:bg-emerald-800 text-white font-semibold text-xs px-3.5 py-1.5 rounded-lg transition-all flex items-center gap-1">
@@ -1971,13 +1969,13 @@
                     acoes = `<button onclick="abrirModalPedido('${req.id}')" class="text-blue-600 hover:underline text-xs font-semibold">Ver Detalhes</button>`;
                 }
 
+                acoes += ` | <button onclick="imprimirPedido('${req.id}')" class="text-gray-600 hover:underline text-xs">Imprimir Pedido</button>`;
+
                 if (isAdmin) {
                     if (req.status === 'approved') {
-                        acoes += ` | <button onclick="imprimirOrdemFornecimento('${req.id}')" class="text-emerald-700 hover:underline text-xs">Ordem Fornec.</button>`;
+                        acoes += ` | <button onclick="imprimirOrdemFornecimento('${req.id}')" class="text-emerald-700 hover:underline text-xs font-semibold">Ordem Fornec.</button>`;
                     }
                     acoes += ` | <button onclick="excluirSolicitacaoLogica('${req.id}')" class="text-red-500 hover:underline text-xs">Excluir</button>`;
-                } else {
-                    acoes += ` | <button onclick="imprimirPedido('${req.id}')" class="text-gray-600 hover:underline text-xs">Imprimir</button>`;
                 }
 
                 html += `
@@ -2173,6 +2171,12 @@
             const req = state.requests.find(r => r.id === id);
             if (!req) return;
 
+            // Trava de segurança extra para garantir impressão só após a liberação
+            if (req.status !== 'approved') {
+                alert("A Ordem de Fornecimento só pode ser impressa após o pedido ser liberado.");
+                return;
+            }
+
             let trs = '';
             req.items.forEach(item => {
                 trs += `
@@ -2251,8 +2255,6 @@
             const modal = document.getElementById('modal-senha');
             modal.classList.add('hidden');
             modal.classList.remove('flex');
-            document.getElementById('nova-senha-input').value = '';
-            document.getElementById('confirma-senha-input').value = '';
         }
 
         function salvarNovaSenha(e) {
@@ -2260,42 +2262,35 @@
             const novaSenha = document.getElementById('nova-senha-input').value;
             const confirmaSenha = document.getElementById('confirma-senha-input').value;
 
-            if (novaSenha.length < 4) {
-                alert("A senha deve ter pelo menos 4 caracteres.");
-                return;
-            }
-
             if (novaSenha !== confirmaSenha) {
-                alert("As senhas digitadas não são iguais!");
+                alert("As senhas digitadas não coincidem!");
                 return;
             }
 
-            db.collection("users").doc(state.currentUser.id).update({ password: novaSenha })
-                .then(() => {
+            if (novaSenha.length < 3) {
+                alert("A nova senha deve possuir pelo menos 3 caracteres.");
+                return;
+            }
+
+            if (state.currentUser) {
+                db.collection("users").doc(state.currentUser.id).update({
+                    password: novaSenha
+                }).then(() => {
                     state.currentUser.password = novaSenha;
                     saveState();
+                    alert("Sua senha foi alterada com sucesso!");
                     fecharModalSenha();
                     document.getElementById('alerta-senha-padrao').classList.add('hidden');
-                    alert("Sua senha foi atualizada com sucesso!");
-                })
-                .catch(err => alert("Erro ao atualizar senha: " + err.message));
-        }
-
-        // --- GERAÇÃO DE CÓDIGO EXCLUSIVO PARA O MATERIAL ---
-        function gerarCodigoMaterial() {
-            let codigo;
-            let existe = true;
-            while (existe) {
-                const numero = Math.floor(1000 + Math.random() * 9000);
-                codigo = `MAT-${numero}`;
-                existe = state.materials.some(m => m.code === codigo);
+                }).catch(err => alert("Erro ao alterar senha: " + err.message));
             }
-            return codigo;
         }
 
+        // Inicializar Aplicação ao carregar
         window.onload = function() {
+            if (state.currentUser) {
+                setSession();
+            }
             iniciarEscutasFirebase();
-            setSession();
         };
     </script>
 </body>
