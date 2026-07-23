@@ -44,6 +44,15 @@
         body.not-admin .col-saldo {
             display: none !important;
         }
+
+        /* Scrollbar suave para as abas em telas menores */
+        .hide-scrollbar::-webkit-scrollbar {
+            display: none;
+        }
+        .hide-scrollbar {
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+        }
     </style>
 </head>
 <body class="bg-gray-50 font-sans text-gray-800 min-h-screen flex flex-col">
@@ -97,10 +106,10 @@
         </div>
     </header>
 
-    <!-- Menu de Navegação (Abas) -->
-    <nav class="bg-white border-b border-gray-200 shadow-sm no-print">
-        <div class="container mx-auto px-4">
-            <div class="flex overflow-x-auto space-x-1 py-2" id="nav-tabs">
+    <!-- Menu de Navegação (Abas Redesenhas) -->
+    <nav class="bg-white/80 backdrop-blur-md border-b border-gray-200/80 shadow-xs no-print sticky top-0 z-40">
+        <div class="container mx-auto px-4 py-2.5">
+            <div class="flex items-center overflow-x-auto hide-scrollbar gap-1.5 p-1 bg-gray-100/90 rounded-2xl border border-gray-200/70 w-fit max-w-full" id="nav-tabs">
                 <!-- Abas geradas dinamicamente pelo JS -->
             </div>
         </div>
@@ -512,7 +521,7 @@
                     criarMateriaisPadrao();
                 }
                 
-                atualizarOpcoesCategorias(); // <--- Atualiza automaticamente os filtros de categorias
+                atualizarOpcoesCategorias();
                 renderCatalogo();
                 renderEstoqueList();
                 renderTabsMenu();
@@ -666,6 +675,7 @@
             switchTab(state.currentTab);
         }
 
+        // RENDERIZAÇÃO DAS ABAS (NOVO DESIGN ESTILIZADO)
         function renderTabsMenu() {
             if (!state.currentUser) return;
             const nav = document.getElementById('nav-tabs');
@@ -675,9 +685,9 @@
             const tabs = [
                 { id: 'solicitacao', label: '📝 Fazer Solicitação', adminOnly: false },
                 { id: 'usuarios', label: '👤 Usuários', adminOnly: true },
-                { id: 'materiais', label: '📦 Materiais (Almoxarifado)', adminOnly: true, badge: lowStockCount },
+                { id: 'materiais', label: '📦 Almoxarifado', adminOnly: true, badge: lowStockCount },
                 { id: 'pendentes', label: '⏳ Pendentes', adminOnly: true, badge: pendingCount },
-                { id: 'historico', label: '📜 Histórico de Pedidos', adminOnly: false }
+                { id: 'historico', label: '📜 Histórico', adminOnly: false }
             ];
 
             let html = '';
@@ -685,18 +695,22 @@
                 if (tab.adminOnly && state.currentUser.role !== 'admin') return;
 
                 const isActive = state.currentTab === tab.id;
+                
+                // Estilização das abas em estilo de botão selecionável (Pill control)
                 const activeClasses = isActive 
-                    ? "border-blue-600 text-blue-600 border-b-2 font-semibold" 
-                    : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 border-b-2";
+                    ? "bg-white text-blue-800 font-bold shadow-xs border border-gray-200/80 scale-[1.01]" 
+                    : "text-gray-600 hover:text-gray-900 hover:bg-white/60 font-medium border border-transparent";
+
+                const badgeHtml = (tab.badge && tab.badge > 0) 
+                    ? `<span class="ml-1.5 inline-flex items-center justify-center bg-rose-500 text-white text-[10px] font-extrabold px-1.5 py-0.5 rounded-full shadow-xs animate-pulse min-w-[18px] h-[18px]">
+                        ${tab.badge}
+                       </span>` 
+                    : '';
 
                 html += `
-                    <button onclick="switchTab('${tab.id}')" class="whitespace-nowrap py-3 px-4 text-sm font-medium transition-all duration-150 flex items-center gap-2 relative ${activeClasses}">
-                        ${tab.label}
-                        ${tab.badge && tab.badge > 0 ? `
-                            <span class="absolute top-2 right-0 bg-red-500 text-white text-[10px] font-bold rounded-full h-5 w-5 flex items-center justify-center animate-pulse">
-                                ${tab.badge}
-                            </span>
-                        ` : ''}
+                    <button onclick="switchTab('${tab.id}')" class="whitespace-nowrap px-4 py-2 text-xs sm:text-sm rounded-xl transition-all duration-200 flex items-center gap-1.5 ${activeClasses}">
+                        <span>${tab.label}</span>
+                        ${badgeHtml}
                     </button>
                 `;
             });
@@ -1162,7 +1176,6 @@
             }
         }
 
-        // Função para alterar a categoria do material cadastrado
         function alterarCategoria(id) {
             const mat = state.materials.find(m => m.id === id);
             if (!mat) return;
