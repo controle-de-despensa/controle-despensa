@@ -174,12 +174,9 @@
                             <p class="text-xs text-gray-500">Selecione os materiais e defina a quantidade necessária</p>
                         </div>
                         <div class="flex flex-wrap sm:flex-nowrap items-center gap-2 w-full sm:w-auto">
+                            <!-- Select alimentado dinamicamente via JS -->
                             <select id="filtro-categoria-catalogo" onchange="renderCatalogo()" class="bg-gray-50 border border-gray-300 rounded-lg px-2.5 py-1.5 text-xs focus:ring-2 focus:ring-blue-500 outline-none">
                                 <option value="todas">Todas as Categorias</option>
-                                <option value="Expediente">Expediente</option>
-                                <option value="Limpeza">Limpeza</option>
-                                <option value="Gêneros Alimentícios">Gêneros Alimentícios</option>
-                                <option value="Mobiliários">Mobiliários</option>
                             </select>
                             <input type="text" id="busca-material" oninput="renderCatalogo()" placeholder="Buscar material..." class="w-full sm:w-48 bg-gray-50 border border-gray-300 rounded-lg px-3 py-1.5 text-xs focus:ring-2 focus:ring-blue-500 outline-none">
                         </div>
@@ -399,6 +396,9 @@
         <p>Sistema de Gestão de Despensa • Firebase Firestore Realtime • 2026</p>
     </footer>
 
+    <!-- Datalist para autocomplete de categorias -->
+    <datalist id="categorias-datalist"></datalist>
+
     <!-- ================= MODAL VER / EDITAR PEDIDO ================= -->
     <div id="modal-ver-pedido" class="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm hidden items-center justify-center p-2 sm:p-4">
         <div class="bg-white rounded-2xl shadow-2xl border border-gray-100 p-4 sm:p-5 w-full max-w-4xl flex flex-col max-h-[92vh]">
@@ -512,6 +512,7 @@
                     criarMateriaisPadrao();
                 }
                 
+                atualizarOpcoesCategorias(); // <--- Atualiza automaticamente os filtros de categorias
                 renderCatalogo();
                 renderEstoqueList();
                 renderTabsMenu();
@@ -538,6 +539,34 @@
                     }
                 }
             });
+        }
+
+        // --- ATUALIZAÇÃO DINÂMICA DAS CATEGORIAS ---
+        function atualizarOpcoesCategorias() {
+            const baseCategories = ['Expediente', 'Limpeza', 'Gêneros Alimentícios', 'Mobiliários'];
+            const materialCategories = state.materials.map(m => m.category).filter(Boolean);
+            const allCategories = Array.from(new Set([...baseCategories, ...materialCategories])).sort();
+
+            // 1. Atualizar Select do Filtro no Catálogo
+            const selectFiltro = document.getElementById('filtro-categoria-catalogo');
+            if (selectFiltro) {
+                const valorAtual = selectFiltro.value || 'todas';
+                let html = '<option value="todas">Todas as Categorias</option>';
+                allCategories.forEach(cat => {
+                    html += `<option value="${cat}">${cat}</option>`;
+                });
+                selectFiltro.innerHTML = html;
+                selectFiltro.value = allCategories.includes(valorAtual) ? valorAtual : 'todas';
+            }
+
+            // 2. Atualizar a Datalist de sugestões para o cadastro de materiais
+            let datalist = document.getElementById('categorias-datalist');
+            if (!datalist) {
+                datalist = document.createElement('datalist');
+                datalist.id = 'categorias-datalist';
+                document.body.appendChild(datalist);
+            }
+            datalist.innerHTML = allCategories.map(cat => `<option value="${cat}">`).join('');
         }
 
         function criarUsuariosPadrao() {
@@ -980,12 +1009,7 @@
                     <input type="text" placeholder="Nome do Material" required class="w-full bg-white border border-gray-300 rounded px-3 py-1.5 text-sm focus:ring-1 focus:ring-blue-500 outline-none mat-name">
                 </td>
                 <td class="py-2 px-1">
-                    <select required class="w-full bg-white border border-gray-300 rounded px-2 py-1.5 text-sm focus:ring-1 focus:ring-blue-500 outline-none mat-category">
-                        <option value="Expediente">Expediente</option>
-                        <option value="Limpeza">Limpeza</option>
-                        <option value="Gêneros Alimentícios">Gêneros Alimentícios</option>
-                        <option value="Mobiliários">Mobiliários</option>
-                    </select>
+                    <input list="categorias-datalist" placeholder="Selecione ou digite..." required class="w-full bg-white border border-gray-300 rounded px-2 py-1.5 text-sm focus:ring-1 focus:ring-blue-500 outline-none mat-category">
                 </td>
                 <td class="py-2 px-1">
                     <input type="text" placeholder="Ex: Un, Pct, Caixa" required class="w-full bg-white border border-gray-300 rounded px-3 py-1.5 text-sm focus:ring-1 focus:ring-blue-500 outline-none text-center mat-unit">
@@ -1054,7 +1078,7 @@
 
             rows.forEach(row => {
                 const name = row.querySelector('.mat-name').value.trim();
-                const category = row.querySelector('.mat-category').value;
+                const category = row.querySelector('.mat-category').value.trim() || 'Geral';
                 const unit = row.querySelector('.mat-unit').value.trim();
                 const balance = parseInt(row.querySelector('.mat-balance').value) || 0;
 
@@ -1138,13 +1162,13 @@
             }
         }
 
-        // Nova função para alterar a categoria do material cadastrado
+        // Função para alterar a categoria do material cadastrado
         function alterarCategoria(id) {
             const mat = state.materials.find(m => m.id === id);
             if (!mat) return;
 
             const novaCategoria = prompt(
-                `Alterar categoria de "${mat.name}".\n\nCategoria atual: ${mat.category || 'Geral'}\n\nDigite a nova categoria (Ex: Expediente, Limpeza, Gêneros Alimentícios, Mobiliários):`,
+                `Alterar categoria de "${mat.name}".\n\nCategoria atual: ${mat.category || 'Geral'}\n\nDigite a nova categoria:`,
                 mat.category || 'Geral'
             );
 
