@@ -315,19 +315,36 @@
                 </form>
             </div>
 
-            <!-- Listagem e Botões de Impressão/Exportação -->
+            <!-- Listagem, Filtros e Botões de Impressão/Exportação -->
             <div class="bg-white p-5 rounded-xl border border-gray-200 shadow-sm">
-                <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-4">
-                    <h2 class="text-lg font-bold text-gray-900">Estoque Atualizado</h2>
-                    <div class="flex items-center gap-2 flex-wrap">
-                        <button onclick="exportarEstoqueCSV()" class="bg-emerald-700 hover:bg-emerald-800 text-white font-semibold px-4 py-2 rounded-lg text-xs flex items-center gap-2 shadow-sm transition-all">
-                            <span>📊</span> Exportar CSV (Excel)
-                        </button>
-                        <button onclick="imprimirEstoqueCompleto()" class="bg-gray-800 hover:bg-gray-950 text-white font-semibold px-4 py-2 rounded-lg text-xs flex items-center gap-2 shadow-sm transition-all">
-                            <span>🖨️</span> Imprimir Relatório de Saldos
-                        </button>
+                <div class="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4 mb-4">
+                    <div>
+                        <h2 class="text-lg font-bold text-gray-900">Estoque Atualizado</h2>
+                        <p class="text-xs text-gray-500">Filtre por categoria ou busque para ajustar o saldo de um material</p>
+                    </div>
+
+                    <!-- Barra de Busca, Categoria e Ações -->
+                    <div class="flex flex-wrap sm:flex-nowrap items-center gap-2 w-full lg:w-auto">
+                        <!-- Select de Categoria -->
+                        <select id="filtro-categoria-estoque" onchange="renderEstoqueList()" class="bg-gray-50 border border-gray-300 rounded-lg px-2.5 py-1.5 text-xs focus:ring-2 focus:ring-blue-500 outline-none">
+                            <option value="todas">Todas as Categorias</option>
+                        </select>
+
+                        <!-- Input de Busca -->
+                        <input type="text" id="busca-material-estoque" oninput="renderEstoqueList()" placeholder="Buscar material ou código..." class="w-full sm:w-48 bg-gray-50 border border-gray-300 rounded-lg px-3 py-1.5 text-xs focus:ring-2 focus:ring-blue-500 outline-none">
+
+                        <!-- Botões de Ação -->
+                        <div class="flex items-center gap-2">
+                            <button onclick="exportarEstoqueCSV()" class="bg-emerald-700 hover:bg-emerald-800 text-white font-semibold px-3 py-1.5 rounded-lg text-xs flex items-center gap-1 shadow-sm transition-all whitespace-nowrap">
+                                <span>📊</span> CSV
+                            </button>
+                            <button onclick="imprimirEstoqueCompleto()" class="bg-gray-800 hover:bg-gray-950 text-white font-semibold px-3 py-1.5 rounded-lg text-xs flex items-center gap-1 shadow-sm transition-all whitespace-nowrap">
+                                <span>🖨️</span> Imprimir
+                            </button>
+                        </div>
                     </div>
                 </div>
+
                 <div class="overflow-x-auto">
                     <table class="w-full text-left border-collapse text-sm">
                         <thead>
@@ -557,18 +574,30 @@
             const allCategories = Array.from(new Set([...baseCategories, ...materialCategories])).sort();
 
             // 1. Atualizar Select do Filtro no Catálogo
-            const selectFiltro = document.getElementById('filtro-categoria-catalogo');
-            if (selectFiltro) {
-                const valorAtual = selectFiltro.value || 'todas';
+            const selectFiltroCatalogo = document.getElementById('filtro-categoria-catalogo');
+            if (selectFiltroCatalogo) {
+                const valorAtual = selectFiltroCatalogo.value || 'todas';
                 let html = '<option value="todas">Todas as Categorias</option>';
                 allCategories.forEach(cat => {
                     html += `<option value="${cat}">${cat}</option>`;
                 });
-                selectFiltro.innerHTML = html;
-                selectFiltro.value = allCategories.includes(valorAtual) ? valorAtual : 'todas';
+                selectFiltroCatalogo.innerHTML = html;
+                selectFiltroCatalogo.value = allCategories.includes(valorAtual) ? valorAtual : 'todas';
             }
 
-            // 2. Atualizar a Datalist de sugestões para o cadastro de materiais
+            // 2. Atualizar Select do Filtro na Aba Materiais (Estoque)
+            const selectFiltroEstoque = document.getElementById('filtro-categoria-estoque');
+            if (selectFiltroEstoque) {
+                const valorAtual = selectFiltroEstoque.value || 'todas';
+                let html = '<option value="todas">Todas as Categorias</option>';
+                allCategories.forEach(cat => {
+                    html += `<option value="${cat}">${cat}</option>`;
+                });
+                selectFiltroEstoque.innerHTML = html;
+                selectFiltroEstoque.value = allCategories.includes(valorAtual) ? valorAtual : 'todas';
+            }
+
+            // 3. Atualizar a Datalist de sugestões para o cadastro de materiais
             let datalist = document.getElementById('categorias-datalist');
             if (!datalist) {
                 datalist = document.createElement('datalist');
@@ -1126,8 +1155,30 @@
                 return;
             }
 
+            const queryInput = document.getElementById('busca-material-estoque');
+            const query = queryInput ? queryInput.value.toLowerCase().trim() : '';
+
+            const catInput = document.getElementById('filtro-categoria-estoque');
+            const categoriaFiltro = catInput ? catInput.value : 'todas';
+
+            // Filtragem por busca (nome ou código) e categoria
+            let filtered = state.materials.filter(m => {
+                const matchName = m.name.toLowerCase().includes(query);
+                const matchCode = (m.code || '').toLowerCase().includes(query);
+                return matchName || matchCode;
+            });
+
+            if (categoriaFiltro !== 'todas') {
+                filtered = filtered.filter(m => m.category === categoriaFiltro);
+            }
+
+            if (filtered.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="6" class="py-8 text-center text-gray-400">Nenhum material encontrado com os filtros aplicados.</td></tr>`;
+                return;
+            }
+
             let html = '';
-            state.materials.forEach(mat => {
+            filtered.forEach(mat => {
                 const isLowStock = mat.balance < 5;
                 const codeClass = isLowStock 
                     ? "text-red-700 bg-red-100 border border-red-200 px-1.5 py-0.5 rounded font-extrabold" 
@@ -1150,9 +1201,9 @@
                         <td class="py-3 px-4 text-center text-gray-600">${mat.unit}</td>
                         <td class="py-3 px-4 text-center font-bold ${isLowStock ? 'text-red-600' : 'text-blue-600'}">${mat.balance}</td>
                         <td class="py-3 px-4 text-center">
-                            <button onclick="ajustarSaldo('${mat.id}')" class="text-blue-600 hover:underline text-xs mr-2">Ajustar Saldo</button>
-                            <button onclick="alterarCategoria('${mat.id}')" class="text-amber-600 hover:underline text-xs mr-2">Alterar Categoria</button>
-                            <button onclick="excluirMaterial('${mat.id}')" class="text-red-500 hover:underline text-xs">Excluir</button>
+                            <button onclick="ajustarSaldo('${mat.id}')" class="text-blue-600 hover:underline text-xs mr-2 font-medium">Ajustar Saldo</button>
+                            <button onclick="alterarCategoria('${mat.id}')" class="text-amber-600 hover:underline text-xs mr-2 font-medium">Alterar Categoria</button>
+                            <button onclick="excluirMaterial('${mat.id}')" class="text-red-500 hover:underline text-xs font-medium">Excluir</button>
                         </td>
                     </tr>
                 `;
